@@ -434,8 +434,8 @@ Si quieres modificar el firmware, agregarle features o estudiar el código, esta
 #### Clonar el repositorio
 
 ```bash
-git clone https://github.com/pepeangell5/ESP32-TOOLS.git
-cd ESP32-TOOLS
+git clone https://github.com/pepeangell5/ESP32-TOOLS-PRO-480x320.git
+cd ESP32-TOOLS-PRO-480x320
 ```
 
 #### Compilar y cargar
