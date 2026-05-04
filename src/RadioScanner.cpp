@@ -52,7 +52,11 @@ static const uint8_t wifiToNrfMap[14] = {
 enum ScanMode { MODE_SPECTRUM = 0, MODE_WATERFALL = 1, MODE_CHANNEL = 2 };
 static ScanMode currentMode = MODE_SPECTRUM;
 
-static RF24 radio(NRF1_CE_PIN, NRF1_CSN_PIN);
+static RF24 radio1(NRF1_CE_PIN, NRF1_CSN_PIN);
+static RF24 radio2(NRF2_CE_PIN, NRF2_CSN_PIN);
+static RF24* scanRadios[] = { &radio1, &radio2 };
+static bool scanRadioOk[] = { false, false };
+static const uint8_t scanRadioCount = sizeof(scanRadios) / sizeof(scanRadios[0]);
 
 // Buffers
 static int  samples[SCAN_LIMIT];        // última lectura cruda por canal NRF
@@ -143,27 +147,54 @@ static void doFullSweep() {
     peakValue   = 0;
     peakChannel = 0;
 
-    for (int i = 0; i < SCAN_LIMIT; i++) {
-        radio.setChannel(i);
-        radio.startListening();
+    memset(samples, 0, sizeof(samples));
+
+    uint8_t activeRadios[2];
+    uint8_t activeCount = 0;
+    for (uint8_t r = 0; r < scanRadioCount; r++) {
+        if (scanRadioOk[r]) activeRadios[activeCount++] = r;
+    }
+    if (activeCount == 0) return;
+
+    for (int base = 0; base < SCAN_LIMIT; base += activeCount) {
+        for (uint8_t slot = 0; slot < activeCount; slot++) {
+            uint8_t r = activeRadios[slot];
+            int ch = base + slot;
+            if (ch >= SCAN_LIMIT || !scanRadioOk[r]) continue;
+            scanRadios[r]->setChannel(ch);
+            scanRadios[r]->startListening();
+        }
         delayMicroseconds(130);
 
-        int s = 0;
+        int channelSamples[2] = { 0 };
         for (int k = 0; k < SAMPLES_PER_CH; k++) {
-            if (radio.testCarrier()) s++;
+            for (uint8_t slot = 0; slot < activeCount; slot++) {
+                uint8_t r = activeRadios[slot];
+                int ch = base + slot;
+                if (ch >= SCAN_LIMIT || !scanRadioOk[r]) continue;
+                if (scanRadios[r]->testCarrier()) channelSamples[slot]++;
+            }
             delayMicroseconds(20);
         }
-        radio.stopListening();
 
-        samples[i] = s;
+        for (uint8_t slot = 0; slot < activeCount; slot++) {
+            uint8_t r = activeRadios[slot];
+            int i = base + slot;
+            if (i >= SCAN_LIMIT || !scanRadioOk[r]) continue;
 
-        // Peak hold con decay lento
-        if (s > peaks[i]) peaks[i] = s;
-        else if (peaks[i] > 0 && (frameCount % 4 == 0)) peaks[i]--;
+            scanRadios[r]->stopListening();
 
-        totalHits += s;
+            int s = channelSamples[slot];
+            samples[i] = s;
 
-        if (s > peakValue) { peakValue = s; peakChannel = i; }
+            // Peak hold con decay lento
+            if (s > peaks[i]) peaks[i] = s;
+            else if (peaks[i] > 0 && (frameCount % 4 == 0)) peaks[i]--;
+
+            totalHits += s;
+
+            if (s > peakValue) { peakValue = s; peakChannel = i; }
+        }
     }
 
     // Ruido global como porcentaje (max teórico = SCAN_LIMIT * MAX_SAMPLE)
@@ -273,6 +304,15 @@ static void geigerAmbient(int intensity) {
         ledcWriteTone(0, freq);
     }
 #endif
+}
+
+static void configureScannerRadio(RF24& radio) {
+    radio.powerUp();
+    radio.setAutoAck(false);
+    radio.setPALevel(RF24_PA_MAX);
+    radio.setDataRate(RF24_1MBPS);
+    radio.startListening();
+    radio.stopListening();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -607,28 +647,40 @@ void runRadioScanner() {
     ledcWriteTone(0, 0);
 #endif
 
-    // Init SPI + NRF
+    // Init SPI + NRF radios
+    pinMode(TFT_CS_PIN, OUTPUT);
+    digitalWrite(TFT_CS_PIN, HIGH);
+    pinMode(NRF1_CSN_PIN, OUTPUT);
+    digitalWrite(NRF1_CSN_PIN, HIGH);
     pinMode(NRF2_CSN_PIN, OUTPUT);
     digitalWrite(NRF2_CSN_PIN, HIGH);
+    pinMode(NRF1_CE_PIN, OUTPUT);
+    digitalWrite(NRF1_CE_PIN, LOW);
     pinMode(NRF2_CE_PIN, OUTPUT);
     digitalWrite(NRF2_CE_PIN, LOW);
     SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN);
-    if (!radio.begin()) {
+
+    scanRadioOk[0] = radio1.begin();
+    if (scanRadioOk[0]) configureScannerRadio(radio1);
+
+    scanRadioOk[1] = radio2.begin();
+    if (scanRadioOk[1]) configureScannerRadio(radio2);
+
+    Serial.printf("[RadioScanner] NRF1 CE:%d CSN:%d -> %s\n",
+                  NRF1_CE_PIN, NRF1_CSN_PIN, scanRadioOk[0] ? "OK" : "FAIL");
+    Serial.printf("[RadioScanner] NRF2 CE:%d CSN:%d -> %s\n",
+                  NRF2_CE_PIN, NRF2_CSN_PIN, scanRadioOk[1] ? "OK" : "FAIL");
+
+    if (!scanRadioOk[0] && !scanRadioOk[1]) {
         tft.fillScreen(TFT_BLACK);
         tft.drawRect(0, 0, 320, 240, TFT_WHITE);
-        drawStringBig(50, 90, "NRF24 ERROR", TFT_RED, 2);
-        drawStringCustom(30, 140, "NRF1 CE:27 CSN:14 SCK:18",
-                         UI_ACCENT, 1);
+        drawStringBig(45, 90, "NRF24 ERROR", TFT_RED, 2);
+        drawStringCustom(30, 130, "NRF1 CE:27 CSN:14", UI_ACCENT, 1);
+        drawStringCustom(30, 145, "NRF2 CE:17 CSN:16", UI_ACCENT, 1);
         drawStringCustom(30, 160, "MISO:19 MOSI:23  OK: return", UI_ACCENT, 1);
         while (digitalRead(BTN_OK) == HIGH) delay(10);
         return;
     }
-
-    radio.setAutoAck(false);
-    radio.setPALevel(RF24_PA_MAX);
-    radio.setDataRate(RF24_1MBPS);
-    radio.startListening();
-    radio.stopListening();
 
     // Reset estado
     memset(samples,     0, sizeof(samples));
@@ -697,7 +749,8 @@ void runRadioScanner() {
     }
 
     ledcWriteTone(0, 0);
-    radio.powerDown();
+    if (scanRadioOk[0]) radio1.powerDown();
+    if (scanRadioOk[1]) radio2.powerDown();
     playExit();
     ledcWriteTone(0, 0);
 }
