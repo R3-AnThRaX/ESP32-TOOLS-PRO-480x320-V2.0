@@ -6,7 +6,7 @@
 #include "SoundUtils.h"
 
 static int cursor = 0;
-static const int MENU_ITEMS = 4;   // antes 3, ahora 4 con FORGET WIFI
+static const int MENU_ITEMS = 3;
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  OLVIDAR RED WIFI · borra credenciales guardadas en NVS
@@ -49,9 +49,11 @@ static void runForgetWifi() {
 
     drawStringCustom(20, 70, "Red guardada:", TFT_WHITE, 1);
 
-    String ssidDisp = savedSSID;
-    if (ssidDisp.length() > 26) ssidDisp = ssidDisp.substring(0, 24) + "..";
-    drawStringCustom(20, 90, ssidDisp, UI_SELECT, 2);
+    if (getTextWidth(savedSSID, 2) <= 280) {
+        drawStringCustom(20, 90, savedSSID, UI_SELECT, 2);
+    } else {
+        drawStringFit(20, 95, savedSSID, UI_SELECT, 280, 1);
+    }
 
     drawStringCustom(20, 130, "Eliminar credenciales?", TFT_WHITE, 1);
     drawStringCustom(20, 144, "La proxima vez que uses una", UI_ACCENT, 1);
@@ -124,10 +126,10 @@ void drawSettings() {
         else if (i == 2) {
             drawStringCustom(20, y, "FORGET WIFI", textColor, 2);
         }
-        else if (i == 3) {
-            drawStringCustom(20, y, "BACK", textColor, 2);
-        }
     }
+
+    tft.drawFastHLine(0, 210, 320, TFT_WHITE);
+    drawStringCustom(10, 220, "OK: SELECT   OK(HOLD): BACK", UI_ACCENT, 1);
 }
 
 void runSettings() {
@@ -157,6 +159,13 @@ void runSettings() {
         }
 
         if (digitalRead(BTN_OK) == LOW) {
+            bool held = waitOkReleaseWasLong();
+            if (held) {
+                exitMenu = true;
+                beep(1000, 40);
+                delay(120);
+                continue;
+            }
 
             if (cursor == 0) {
                 soundEnabled = !soundEnabled;
@@ -173,13 +182,7 @@ void runSettings() {
                 delay(100);
                 runForgetWifi();
             }
-            else if (cursor == 3) {
-                exitMenu = true;
-            }
-
             drawSettings();
-
-            while (digitalRead(BTN_OK) == LOW);
             delay(150);
         }
 

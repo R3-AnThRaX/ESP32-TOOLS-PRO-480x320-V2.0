@@ -228,9 +228,8 @@ static void drawTargetList(int cursor, int scrollOffset) {
     drawStringCustom(230, 12, "[" + String(targetCount) + " devs]", UI_ACCENT, 1);
     tft.drawFastHLine(0, 30, 320, UI_ACCENT);
 
-    int totalItems = targetCount + 2;
+    int totalItems = targetCount + 1;
     int rescanIdx  = targetCount;
-    int backIdx    = targetCount + 1;
 
     const int rowH = 28;
     const int listY = 36;
@@ -249,13 +248,14 @@ static void drawTargetList(int cursor, int scrollOffset) {
 
         if (idx == rescanIdx) {
             drawStringCustom(10, y + 7, "< RESCAN", colMain, 2);
-        } else if (idx == backIdx) {
-            drawStringCustom(10, y + 7, "< BACK",   colMain, 2);
         } else {
             Target& t = targets[idx];
             String name = t.name.length() > 0 ? t.name : "<unnamed>";
-            if (name.length() > 20) name = name.substring(0, 18) + "..";
-            drawStringCustom(10, y + 4, name, colMain, 2);
+            if (getTextWidth(name, 2) <= 190) {
+                drawStringCustom(10, y + 4, name, colMain, 2);
+            } else {
+                drawStringFit(10, y + 8, name, colMain, 190, 1);
+            }
             drawStringCustom(10, y + 18, t.mac, colSub, 1);
 
             String rssi = String(t.rssi) + "dBm";
@@ -282,13 +282,13 @@ static void drawTargetList(int cursor, int scrollOffset) {
     }
 
     tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-    drawStringCustom(10, 222, "UP/DN:NAV   OK:SELECT", UI_ACCENT, 1);
+    drawStringCustom(10, 222, "OK:SELECT  OK(HOLD):BACK", UI_ACCENT, 1);
 }
 
 static int selectTarget() {
     int cursor = 0;
     int scrollOffset = 0;
-    int totalItems = targetCount + 2;
+    int totalItems = targetCount + 1;
 
     drawTargetList(cursor, scrollOffset);
 
@@ -312,11 +312,11 @@ static int selectTarget() {
             delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
+            if (held) return -1;
             if (cursor == targetCount) return -2;
-            if (cursor == targetCount + 1) return -1;
             return cursor;
         }
         delay(20);
@@ -334,12 +334,11 @@ static void drawModeMenu(int cursor, const Target& t) {
     tft.drawFastHLine(0, 30, 320, UI_ACCENT);
 
     String tName = t.name.length() > 0 ? t.name : "<unnamed>";
-    if (tName.length() > 22) tName = tName.substring(0, 20) + "..";
-    drawStringCustom(10, 38, "Target: " + tName, UI_SELECT, 1);
+    drawStringFit(10, 38, "Target: " + tName, UI_SELECT, 300, 1);
     drawStringCustom(10, 50, "MAC:    " + t.mac, UI_ACCENT, 1);
     tft.drawFastHLine(0, 63, 320, UI_ACCENT);
 
-    int totalItems = ATK_COUNT + 1;
+    int totalItems = ATK_COUNT;
     for (int i = 0; i < totalItems; i++) {
         int y = 70 + i * 26;
         bool selected = (i == cursor);
@@ -349,21 +348,17 @@ static void drawModeMenu(int cursor, const Target& t) {
         uint16_t colMain = selected ? UI_BG : UI_MAIN;
         uint16_t colSub  = selected ? UI_BG : UI_ACCENT;
 
-        if (i == ATK_COUNT) {
-            drawStringCustom(15, y + 4, "< BACK", colMain, 2);
-        } else {
-            drawStringCustom(15, y + 2, ATK_NAMES[i], colMain, 2);
-            drawStringCustom(15, y + 14, ATK_DESCS[i], colSub, 1);
-        }
+        drawStringCustom(15, y + 2, ATK_NAMES[i], colMain, 2);
+        drawStringCustom(15, y + 14, ATK_DESCS[i], colSub, 1);
     }
 
     tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-    drawStringCustom(10, 222, "UP/DN:NAV   OK:START", UI_ACCENT, 1);
+    drawStringCustom(10, 222, "OK:START   OK(HOLD):BACK", UI_ACCENT, 1);
 }
 
 static int selectAttackMode(const Target& t) {
     int cursor = 0;
-    int totalItems = ATK_COUNT + 1;
+    int totalItems = ATK_COUNT;
 
     drawModeMenu(cursor, t);
 
@@ -381,10 +376,10 @@ static int selectAttackMode(const Target& t) {
             delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
-            if (cursor == ATK_COUNT) return -1;
+            if (held) return -1;
             return cursor;
         }
         delay(20);
@@ -479,9 +474,8 @@ static void drawAttackFrame() {
     tft.drawFastHLine(0, 36, 320, UI_SELECT);
 
     String tName = activeTarget.name.length() > 0 ? activeTarget.name : "<unnamed>";
-    if (tName.length() > 22) tName = tName.substring(0, 20) + "..";
 
-    drawStringCustom(10, 44, "Target: " + tName, UI_MAIN, 1);
+    drawStringFit(10, 44, "Target: " + tName, UI_MAIN, 300, 1);
     drawStringCustom(10, 58, "Mode:   " + String(ATK_NAMES[activeMode]), UI_MAIN, 1);
 
     drawStringCustom(10, 82,  "Time:",    UI_ACCENT, 1);

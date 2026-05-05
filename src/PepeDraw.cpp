@@ -607,14 +607,34 @@ int getTextWidth(const String& txt, int size, FontType font) {
     int idx = 0;
     while (idx < (int)txt.length()) {
         uint16_t cp = nextCodepoint(txt, idx);
-        if (font == FONT_SMALL) total += charAdvanceS(cp);
-        else                    total += charAdvanceB(cp);
+        total += (font == FONT_SMALL) ? charAdvanceS(cp) : charAdvanceB(cp);
     }
     return total * size;
 }
 
 int getFontHeight(int size, FontType font) {
-    return (font == FONT_SMALL ? 7 : 12) * size;
+    return ((font == FONT_SMALL) ? 7 : 12) * size;
+}
+
+String truncateToWidth(const String& txt, int maxWidth, int size, FontType font) {
+    if (maxWidth <= 0) return "";
+    if (getTextWidth(txt, size, font) <= maxWidth) return txt;
+
+    const String ellipsis = "..";
+    if (getTextWidth(ellipsis, size, font) >= maxWidth) return "";
+
+    int idx = 0;
+    int lastGood = 0;
+    while (idx < (int)txt.length()) {
+        nextCodepoint(txt, idx);
+        String candidate = txt.substring(0, idx) + ellipsis;
+        if (getTextWidth(candidate, size, font) > maxWidth) {
+            return (lastGood > 0) ? txt.substring(0, lastGood) + ellipsis : ellipsis;
+        }
+        lastGood = idx;
+    }
+
+    return ellipsis;
 }
 
 // Renderizado genérico
@@ -646,7 +666,6 @@ static void drawStringGeneric(int x, int y, const String& txt,
 
 // ── Compatibilidad hacia atrás ────────────────────────────────────────────
 void drawCharCustom(int x, int y, char c, uint16_t color, int size) {
-    // Para chars simples (ASCII). Para acentos usar drawStringCustom.
     GlyphS g;
     if (lookupSmall((uint16_t)(uint8_t)c, g)) {
         drawGlyphS(x, y, g, color, size);
@@ -660,6 +679,12 @@ void drawStringCustom(int x, int y, String txt, uint16_t color, int size) {
 // ── API nueva ─────────────────────────────────────────────────────────────
 void drawStringBig(int x, int y, const String& txt, uint16_t color, int size) {
     drawStringGeneric(x, y, txt, color, size, FONT_BIG);
+}
+
+void drawStringFit(int x, int y, const String& txt, uint16_t color,
+                   int maxWidth, int size, FontType font) {
+    String fitted = truncateToWidth(txt, maxWidth, size, font);
+    drawStringGeneric(x, y, fitted, color, size, font);
 }
 
 void drawStringCentered(int y, const String& txt, uint16_t color,

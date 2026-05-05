@@ -83,7 +83,6 @@ void setup() {
     runMainMenu();
 
     // ── Menú principal (bucle infinito, nunca regresa) ──────────────────
-    runMainMenu();
 }
 
 void loop() {

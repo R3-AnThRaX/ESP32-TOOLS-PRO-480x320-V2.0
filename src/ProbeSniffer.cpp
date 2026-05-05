@@ -194,10 +194,8 @@ static void drawList() {
         uint16_t col1 = sel ? UI_BG : UI_MAIN;
         uint16_t col2 = sel ? UI_BG : UI_ACCENT;
 
-        // SSID truncado si es largo
         String s = String(probes[idx].ssid);
-        if (s.length() > 22) s = s.substring(0, 20) + "..";
-        drawStringCustom(8, y + 4, s, col1, 1);
+        drawStringFit(8, y + 4, s, col1, 270, 1);
 
         // Línea inferior: count + RSSI + tiempo
         unsigned long ago = (millis() - probes[idx].lastSeenMs) / 1000;

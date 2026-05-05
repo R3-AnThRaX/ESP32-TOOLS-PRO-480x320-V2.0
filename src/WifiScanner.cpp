@@ -196,12 +196,6 @@ static void drawSignalBars(int x, int y, int bars) {
     }
 }
 
-// Trunca SSID a maxChars caracteres (con ... si aplica)
-static String truncate(const String& s, int maxChars) {
-    if ((int)s.length() <= maxChars) return s;
-    return s.substring(0, maxChars - 2) + "..";
-}
-
 // ═════════════════════════════════════════════════════════════════════════════
 // PANTALLA DE DETALLES (mejorada)
 // ═════════════════════════════════════════════════════════════════════════════
@@ -217,10 +211,14 @@ static void showDetails(const NetInfo& net) {
 
     // SSID (con detección de oculta)
     bool hidden = (net.ssid.length() == 0);
-    String displaySsid = hidden ? "<HIDDEN>" : truncate(net.ssid, 22);
+    String displaySsid = hidden ? "<HIDDEN>" : net.ssid;
     drawStringCustom(10, y, "SSID:", UI_ACCENT, 1);
-    drawStringCustom(10, y + 10, displaySsid,
-                     hidden ? TFT_RED : TFT_WHITE, 2);
+    if (!hidden && getTextWidth(displaySsid, 2) > 300) {
+        drawStringFit(10, y + 10, displaySsid, TFT_WHITE, 300, 1);
+    } else {
+        drawStringFit(10, y + 10, displaySsid,
+                      hidden ? TFT_RED : TFT_WHITE, 300, 2);
+    }
     y += 34;
 
     // Canal + frecuencia
@@ -279,7 +277,7 @@ static void drawList(const NetInfo* nets, int n, int cursor, int scrollOffset) {
 
     // Header
     tft.fillRect(0, 0, 320, 25, TFT_WHITE);
-    String hdr = "NETS " + String(n) + "  SEL:" + String(cursor);
+    String hdr = "NETS " + String(n) + "  SEL:" + String(cursor + 1);
     drawStringCustom(10, 5, hdr, TFT_BLACK, 2);
 
     // Lista
@@ -287,16 +285,8 @@ static void drawList(const NetInfo* nets, int n, int cursor, int scrollOffset) {
         int idx = i + scrollOffset;
         int yPos = 35 + (i * 30);
 
-        if (idx == 0) {
-            // "BACK TO MENU"
-            if (cursor == 0) {
-                tft.fillRect(5, yPos - 4, 305, 26, TFT_WHITE);
-                drawStringCustom(15, yPos, "< BACK TO MENU", TFT_BLACK, 2);
-            } else {
-                drawStringCustom(15, yPos, "< BACK TO MENU", TFT_WHITE, 2);
-            }
-        } else if (idx <= n) {
-            int netIdx = idx - 1;
+        if (idx < n) {
+            int netIdx = idx;
             const NetInfo& net = nets[netIdx];
             bool isSelected = (cursor == idx);
 
@@ -307,12 +297,15 @@ static void drawList(const NetInfo* nets, int n, int cursor, int scrollOffset) {
             drawSignalBars(12, yPos + 2, rssiToBars(net.rssi));
 
             // SSID (o <HIDDEN>)
-            String label = (net.ssid.length() == 0) ? "<HIDDEN>"
-                                                    : truncate(net.ssid, 11);
+            String label = (net.ssid.length() == 0) ? "<HIDDEN>" : net.ssid;
             uint16_t ssidColor = (net.ssid.length() == 0)
                                  ? (isSelected ? TFT_RED : TFT_RED)
                                  : fg;
-            drawStringCustom(45, yPos, label, ssidColor, 2);
+            if (getTextWidth(label, 2) <= 220) {
+                drawStringCustom(45, yPos, label, ssidColor, 2);
+            } else {
+                drawStringFit(45, yPos + 5, label, ssidColor, 220, 1);
+            }
 
             // Encryption tag (colorcodeado)
             uint16_t encCol = isSelected ? TFT_BLACK : authToColor(net.authType);
@@ -321,12 +314,15 @@ static void drawList(const NetInfo* nets, int n, int cursor, int scrollOffset) {
     }
 
     // Scroll bar lateral (si hay más entradas de las visibles)
-    int totalEntries = n + 1;   // +1 por BACK
+    int totalEntries = n;
     if (totalEntries > VISIBLE_LINES) {
         int barH = map(VISIBLE_LINES, 0, totalEntries, 20, 180);
         int barY = map(scrollOffset, 0, totalEntries - VISIBLE_LINES, 30, 210 - barH);
         tft.fillRect(314, barY, 4, barH, UI_ACCENT);
     }
+
+    tft.drawFastHLine(0, 218, 320, UI_ACCENT);
+    drawStringCustom(8, 225, "OK:DETAILS  OK(HOLD):BACK", UI_ACCENT, 1);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -397,33 +393,34 @@ void runWifiScan() {
 
         // DOWN
         if (digitalRead(BTN_DOWN) == LOW) {
-            if (cursor < n) {
-                cursor++;
-                if (cursor >= scrollOffset + VISIBLE_LINES) scrollOffset++;
-                needsRedraw = true;
-                beep(2000, 30);
-                delay(200);
-            }
+            cursor = (cursor + 1) % n;
+            if (cursor < scrollOffset) scrollOffset = cursor;
+            if (cursor >= scrollOffset + VISIBLE_LINES)
+                scrollOffset = cursor - VISIBLE_LINES + 1;
+            needsRedraw = true;
+            beep(2000, 30);
+            delay(200);
         }
 
         // UP
         if (digitalRead(BTN_UP) == LOW) {
-            if (cursor > 0) {
-                cursor--;
-                if (cursor < scrollOffset) scrollOffset--;
-                needsRedraw = true;
-                beep(2000, 30);
-                delay(200);
-            }
+            cursor = (cursor + n - 1) % n;
+            if (cursor < scrollOffset) scrollOffset = cursor;
+            if (cursor >= scrollOffset + VISIBLE_LINES)
+                scrollOffset = cursor - VISIBLE_LINES + 1;
+            needsRedraw = true;
+            beep(2000, 30);
+            delay(200);
         }
 
         // OK
         if (digitalRead(BTN_OK) == LOW) {
-            if (cursor == 0) {
+            bool held = waitOkReleaseWasLong();
+            if (held) {
                 exitScan = true;
             } else {
                 beep(1200, 50);
-                showDetails(networks[cursor - 1]);
+                showDetails(networks[cursor]);
                 needsRedraw = true;
             }
             delay(250);

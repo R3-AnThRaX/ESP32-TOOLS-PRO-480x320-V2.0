@@ -258,7 +258,7 @@ static void drawAPList(int cursor, int scrollOffset) {
     tft.drawFastHLine(0, 30, 320, UI_ACCENT);
 
     // Items: RAMBO (0), APs (1..apCount), RESCAN, BACK
-    int totalItems = apCount + 3;
+    int totalItems = apCount + 2;
     const int rowH = 32;
     const int listY = 36;
 
@@ -282,15 +282,16 @@ static void drawAPList(int cursor, int scrollOffset) {
                              colSub, 1);
         } else if (idx == apCount + 1) {
             drawStringCustom(10, y + 10, "< RESCAN", colMain, 2);
-        } else if (idx == apCount + 2) {
-            drawStringCustom(10, y + 10, "< BACK", colMain, 2);
         } else {
             int apIdx = idx - 1;
             APInfo& a = aps[apIdx];
 
             String s = a.ssid;
-            if (s.length() > 20) s = s.substring(0, 18) + "..";
-            drawStringCustom(10, y + 4, s, colMain, 2);
+            if (getTextWidth(s, 2) <= 260) {
+                drawStringCustom(10, y + 4, s, colMain, 2);
+            } else {
+                drawStringFit(10, y + 8, s, colMain, 260, 1);
+            }
 
             String meta = "CH" + String(a.channel) + " " +
                           String(a.rssi) + "dBm";
@@ -319,7 +320,7 @@ static void drawAPList(int cursor, int scrollOffset) {
     }
 
     tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-    drawStringCustom(10, 222, "UP/DN:NAV   OK:SELECT", UI_ACCENT, 1);
+    drawStringCustom(10, 222, "OK:SELECT  OK(HOLD):BACK", UI_ACCENT, 1);
 }
 
 // Devuelve:
@@ -327,7 +328,7 @@ static void drawAPList(int cursor, int scrollOffset) {
 static int selectAP() {
     int cursor = 1;   // iniciar en el primer AP real, no en RAMBO
     int scrollOffset = 0;
-    int totalItems = apCount + 3;
+    int totalItems = apCount + 2;
 
     drawAPList(cursor, scrollOffset);
 
@@ -351,13 +352,13 @@ static int selectAP() {
             delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
+            if (held) return -3;
 
             if (cursor == 0)              return -1;   // RAMBO
             if (cursor == apCount + 1)    return -2;   // RESCAN
-            if (cursor == apCount + 2)    return -3;   // BACK
             return cursor - 1;                          // índice AP real
         }
         delay(20);
@@ -422,9 +423,7 @@ static void drawActionMenu(int cursor, const APInfo& ap) {
     tft.drawFastHLine(0, 30, 320, UI_ACCENT);
 
     // AP info
-    String s = ap.ssid;
-    if (s.length() > 22) s = s.substring(0, 20) + "..";
-    drawStringCustom(10, 38, "AP: " + s, UI_SELECT, 1);
+    drawStringFit(10, 38, "AP: " + ap.ssid, UI_SELECT, 300, 1);
     drawStringCustom(10, 50, "BSSID: " + ap.bssidStr, UI_ACCENT, 1);
     drawStringCustom(10, 62, "Channel: " + String(ap.channel) + "  RSSI: " +
                      String(ap.rssi) + "dBm", UI_ACCENT, 1);
@@ -433,8 +432,7 @@ static void drawActionMenu(int cursor, const APInfo& ap) {
     // 3 opciones
     const char* items[] = {
         "Broadcast Deauth NOW",
-        "Scan Clients (15s)",
-        "< BACK"
+        "Scan Clients (15s)"
     };
     const char* descs[] = {
         "Desconecta a todos",
@@ -442,7 +440,7 @@ static void drawActionMenu(int cursor, const APInfo& ap) {
         ""
     };
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 2; i++) {
         int y = 85 + i * 32;
         bool selected = (i == cursor);
 
@@ -458,7 +456,7 @@ static void drawActionMenu(int cursor, const APInfo& ap) {
     }
 
     tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-    drawStringCustom(10, 222, "UP/DN:NAV   OK:SELECT", UI_ACCENT, 1);
+    drawStringCustom(10, 222, "OK:SELECT  OK(HOLD):BACK", UI_ACCENT, 1);
 }
 
 // Devuelve: 0=broadcast, 1=scan clients, -1=back
@@ -468,22 +466,22 @@ static int selectAction(const APInfo& ap) {
 
     while (true) {
         if (digitalRead(BTN_UP) == LOW) {
-            cursor = (cursor - 1 + 3) % 3;
+            cursor = (cursor - 1 + 2) % 2;
             beep(2100, 20);
             drawActionMenu(cursor, ap);
             delay(180);
         }
         if (digitalRead(BTN_DOWN) == LOW) {
-            cursor = (cursor + 1) % 3;
+            cursor = (cursor + 1) % 2;
             beep(2100, 20);
             drawActionMenu(cursor, ap);
             delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
-            if (cursor == 2) return -1;
+            if (held) return -1;
             return cursor;
         }
         delay(20);
@@ -648,8 +646,8 @@ static void drawClientList(int cursor, int scrollOffset) {
                      UI_ACCENT, 1);
     tft.drawFastHLine(0, 30, 320, UI_ACCENT);
 
-    // Items: ALL_CLIENTS (0), clients (1..clientCount), RESCAN, BACK
-    int totalItems = clientCount + 3;
+    // Items: ALL_CLIENTS (0), clients (1..clientCount), RESCAN
+    int totalItems = clientCount + 2;
     const int rowH = 28;
     const int listY = 36;
 
@@ -671,8 +669,6 @@ static void drawClientList(int cursor, int scrollOffset) {
                              colSub, 1);
         } else if (idx == clientCount + 1) {
             drawStringCustom(10, y + 7, "< RESCAN", colMain, 2);
-        } else if (idx == clientCount + 2) {
-            drawStringCustom(10, y + 7, "< BACK", colMain, 2);
         } else {
             int cIdx = idx - 1;
             ClientInfo& c = clients[cIdx];
@@ -695,14 +691,14 @@ static void drawClientList(int cursor, int scrollOffset) {
     }
 
     tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-    drawStringCustom(10, 222, "UP/DN:NAV   OK:DEAUTH", UI_ACCENT, 1);
+    drawStringCustom(10, 222, "OK:DEAUTH  OK(HOLD):BACK", UI_ACCENT, 1);
 }
 
 // Devuelve: -3=BACK, -2=RESCAN, -1=ALL, 0..clientCount-1 = client
 static int selectTarget() {
     int cursor = 0;
     int scrollOffset = 0;
-    int totalItems = clientCount + 3;
+    int totalItems = clientCount + 2;
 
     drawClientList(cursor, scrollOffset);
 
@@ -726,13 +722,13 @@ static int selectTarget() {
             delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
+            if (held) return -3;
 
             if (cursor == 0)              return -1;   // ALL
             if (cursor == clientCount + 1) return -2;  // RESCAN
-            if (cursor == clientCount + 2) return -3;  // BACK
             return cursor - 1;
         }
         delay(20);
@@ -758,8 +754,7 @@ static void drawAttackFrame() {
         drawStringCustom(10, 72, "Targets: broadcast",       UI_MAIN, 1);
     } else {
         String s = activeAP.ssid;
-        if (s.length() > 24) s = s.substring(0, 22) + "..";
-        drawStringCustom(10, 44, "AP:     " + s, UI_MAIN, 1);
+        drawStringFit(10, 44, "AP:     " + s, UI_MAIN, 300, 1);
         if (broadcastMode) {
             drawStringCustom(10, 58, "Target: ALL (broadcast)", UI_MAIN, 1);
         } else {

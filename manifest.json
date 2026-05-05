@@ -1,14 +1,17 @@
 {
-  "name": "ESP32-TOOLS",
-  "version": "2.0",
-  "home_assistant_domain": "esp32tools",
-  "funding_url": "https://github.com/pepeangell5/ESP32-TOOLS-PRO-480x320",
+  "name": "ESP32-TOOLS MODERN",
+  "version": "3.0-modern",
+  "home_assistant_domain": "esp32_tools_modern",
+  "funding_url": "https://github.com/pepeangell5/ESP32-TOOLS-MODERN",
   "new_install_prompt_erase": true,
   "builds": [
     {
       "chipFamily": "ESP32",
       "parts": [
-        { "path": "firmware/firmware-merged.bin", "offset": 0 }
+        {
+          "path": "firmware/firmware-merged.bin",
+          "offset": 0
+        }
       ]
     }
   ]

@@ -320,8 +320,7 @@ static void drawModeMenu(int cursor) {
     drawStringBig(10, 8, "BEACON SPAM", UI_MAIN, 1);
     tft.drawFastHLine(0, 30, 320, UI_ACCENT);
 
-    // Lista de modos
-    int totalItems = MODE_COUNT + 1;  // +1 por BACK
+    int totalItems = MODE_COUNT;
 
     for (int i = 0; i < totalItems; i++) {
         int y = 40 + i * 26;
@@ -332,21 +331,17 @@ static void drawModeMenu(int cursor) {
         uint16_t colMain = selected ? UI_BG : UI_MAIN;
         uint16_t colSub  = selected ? UI_BG : UI_ACCENT;
 
-        if (i == MODE_COUNT) {
-            drawStringCustom(15, y + 4, "< BACK", colMain, 2);
-        } else {
-            drawStringCustom(15, y + 2, MODE_NAMES[i], colMain, 2);
-            drawStringCustom(15, y + 14, MODE_DESCS[i], colSub, 1);
-        }
+        drawStringCustom(15, y + 2, MODE_NAMES[i], colMain, 2);
+        drawStringCustom(15, y + 14, MODE_DESCS[i], colSub, 1);
     }
 
     tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-    drawStringCustom(10, 222, "UP/DN:NAV   OK:START", UI_ACCENT, 1);
+    drawStringCustom(10, 222, "OK:START   OK(HOLD):BACK", UI_ACCENT, 1);
 }
 
 static int selectMode() {
     int cursor = 0;
-    int totalItems = MODE_COUNT + 1;
+    int totalItems = MODE_COUNT;
 
     drawModeMenu(cursor);
 
@@ -364,10 +359,10 @@ static int selectMode() {
             delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
-            if (cursor == MODE_COUNT) return -1;
+            if (held) return -1;
             return cursor;
         }
         delay(20);
@@ -410,8 +405,7 @@ static void drawAttackStats(unsigned long pkts, float rate) {
     // Current SSID (puede tener emojis = más ancho, truncar visualmente)
     tft.fillRect(10, 95, 300, 18, TFT_BLACK);
     String s = currentSSID;
-    if (s.length() > 30) s = s.substring(0, 28) + "..";
-    drawStringCustom(20, 97, s, TFT_CYAN, 1);
+    drawStringFit(20, 97, s, TFT_CYAN, 280, 1);
 
     // Beacons
     tft.fillRect(80, 118, 230, 14, TFT_BLACK);

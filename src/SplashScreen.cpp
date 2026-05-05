@@ -7,6 +7,14 @@
 
 extern DisplayTFT tft;
 
+static constexpr uint16_t BOOT_BG       = TFT_BLACK;
+static constexpr uint16_t BOOT_PANEL    = TFT_BLACK;
+static constexpr uint16_t BOOT_LINE     = TFT_WHITE;
+static constexpr uint16_t BOOT_TEXT     = TFT_WHITE;
+static constexpr uint16_t BOOT_MUTED    = TFT_WHITE;
+static constexpr uint16_t BOOT_CYAN     = TFT_WHITE;
+static constexpr uint16_t BOOT_ORANGE   = UI_SELECT;
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  BITMAP DEL AJOLOTE CON LENTES · 96x80 píxeles monochrome
 //  · 80 filas × 12 bytes = 960 bytes
@@ -148,13 +156,9 @@ static void typeOn(int x, int y, const String& txt, uint16_t color,
     String partial = "";
     for (int i = 0; i < (int)txt.length(); i++) {
         partial += txt[i];
-        if (font == FONT_BIG) {
-            tft.fillRect(x, y, 320 - x, 12 * size, TFT_BLACK);
-            drawStringBig(x, y, partial, color, size);
-        } else {
-            tft.fillRect(x, y, 320 - x, 7 * size, TFT_BLACK);
-            drawStringCustom(x, y, partial, color, size);
-        }
+        tft.fillRect(x, y, 320 - x, (font == FONT_BIG) ? 32 : 16, BOOT_BG);
+        if (font == FONT_BIG) drawStringBig(x, y, partial, color, size);
+        else drawStringCustom(x, y, partial, color, size);
         delay(msPerChar);
     }
 }
@@ -165,16 +169,16 @@ static void typeOn(int x, int y, const String& txt, uint16_t color,
 static void drawLoadingStep(const String& stepText, int progress,
                             uint16_t toneFreq) {
     int statusY = 175;
-    tft.fillRect(10, statusY, 300, 10, TFT_BLACK);
-    drawStringCustom(10, statusY, stepText, UI_ACCENT, 1);
+    tft.fillRect(10, statusY, 300, 14, BOOT_BG);
+    drawStringCustom(10, statusY, stepText, BOOT_MUTED, 1);
 
     int barX = 10, barY = 190, barW = 300, barH = 8;
-    tft.drawRect(barX, barY, barW, barH, UI_ACCENT);
+    tft.drawRect(barX, barY, barW, barH, BOOT_CYAN);
 
     int fillW = (barW - 2) * progress / 100;
-    tft.fillRect(barX + 1, barY + 1, barW - 2, barH - 2, TFT_BLACK);
+    tft.fillRect(barX + 1, barY + 1, barW - 2, barH - 2, BOOT_PANEL);
     if (fillW > 0) {
-        tft.fillRect(barX + 1, barY + 1, fillW, barH - 2, UI_MAIN);
+        tft.fillRect(barX + 1, barY + 1, fillW, barH - 2, BOOT_ORANGE);
     }
     beep(toneFreq, 40);
 }
@@ -183,65 +187,54 @@ static void drawLoadingStep(const String& stepText, int progress,
 //  MAIN · SPLASH SCREEN
 // ═══════════════════════════════════════════════════════════════════════════
 void runSplashScreen() {
-    tft.fillScreen(TFT_BLACK);
-    tft.drawRect(0, 0, 320, 240, UI_MAIN);
+    tft.fillScreen(BOOT_BG);
+    tft.drawRect(0, 0, 320, 240, BOOT_LINE);
+    tft.drawRect(2, 2, 316, 236, BOOT_LINE);
+    tft.drawFastHLine(0, 34, 320, BOOT_LINE);
+    tft.drawFastHLine(0, 206, 320, BOOT_LINE);
 
-    // FASE 1: Scan-in del ajolote
-    int ajoX = (320 - AJOLOTE_WIDTH) / 2;
-    int ajoY = 15;
-    animateScanIn(ajoX, ajoY);
+    drawStringCustom(12, 12, "MINIMAL MODE", BOOT_TEXT, 1);
+    drawStringCustom(236, 12, "BUILD 2026", BOOT_TEXT, 1);
 
-    delay(200);
+    tft.drawRect(34, 56, 252, 94, BOOT_LINE);
+    tft.drawFastVLine(50, 64, 78, BOOT_LINE);
 
-    // FASE 2: Textos type-on
-    {
-        String title = "ESP32-TOOLS";
-        int titleW   = getTextWidth(title, 2, FONT_BIG);
-        int titleX   = (320 - titleW) / 2;
-        int titleY   = 105;
-        typeOn(titleX, titleY, title, UI_MAIN, 2, FONT_BIG, 55);
-    }
-    delay(150);
-    {
-        String author = "BY: PepeAngell";
-        int authW     = getTextWidth(author, 2, FONT_SMALL);
-        int authX     = (320 - authW) / 2;
-        int authY     = 140;
-        typeOn(authX, authY, author, UI_ACCENT, 2, FONT_SMALL, 40);
-    }
-    delay(250);
+    String title = "ESP32 TOOLS";
+    int titleX = (320 - getTextWidth(title, 2, FONT_BIG)) / 2;
+    typeOn(titleX, 78, title, BOOT_TEXT, 2, FONT_BIG, 35);
 
-    // FASE 3: Loading steps
-    drawLoadingStep("Initializing NVS...",      25,  1200);
-    delay(180);
-    drawLoadingStep("Loading preferences...",   50,  1600);
-    delay(180);
-    drawLoadingStep("Mounting display...",      75,  2000);
-    delay(180);
-    drawLoadingStep("Ready.",                  100,  2600);
-    delay(300);
+    String sub = "MODERN MINIMAL";
+    int subX = (320 - getTextWidth(sub, 1, FONT_SMALL)) / 2;
+    typeOn(subX, 124, sub, BOOT_TEXT, 1, FONT_SMALL, 25);
 
-    // FASE 4: Boot count + esperar OK
+    drawLoadingStep("NVS READY",         25, 1200);
+    delay(120);
+    drawLoadingStep("DISPLAY READY",     50, 1600);
+    delay(120);
+    drawLoadingStep("DUAL NRF READY",    75, 2000);
+    delay(120);
+    drawLoadingStep("INTERFACE READY",  100, 2600);
+    delay(220);
+
     unsigned long bootCount = nvsGetULong("boot_cnt", 0);
     String bootInfo = "Boot #" + String(bootCount);
-    drawStringCustom(10, 215, bootInfo, UI_ACCENT, 1);
+    drawStringCustom(10, 218, bootInfo, BOOT_TEXT, 1);
 
     String pressText = "PRESS OK TO CONTINUE";
-    int pressW = getTextWidth(pressText, 1);
+    int pressW = getTextWidth(pressText, 1, FONT_SMALL);
     int pressX = 310 - pressW;
-    int pressY = 215;
+    int pressY = 218;
 
     beep(2400, 60);
     delay(40);
     beep(3000, 80);
 
-// Texto fijo, sin parpadeo
-    tft.fillRect(pressX, pressY, pressW + 4, 8, TFT_BLACK);
-    drawStringCustom(pressX, pressY, pressText, UI_SELECT, 1);
+    tft.fillRect(pressX - 4, pressY - 2, pressW + 8, 12, BOOT_BG);
+    drawStringCustom(pressX, pressY, pressText, BOOT_TEXT, 1);
 
     while (digitalRead(BTN_OK) == HIGH) {
-    delay(20);
-}
+        delay(20);
+    }
 
     beep(2200, 50);
     delay(30);

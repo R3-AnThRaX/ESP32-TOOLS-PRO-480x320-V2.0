@@ -257,10 +257,11 @@ static void drawList(int cursor, int scrollOffset, int totalSeen) {
 
         // Nombre (o "<unnamed>")
         String displayName = d.name.length() > 0 ? d.name : "<unnamed>";
-        if (displayName.length() > 20) {
-            displayName = displayName.substring(0, 18) + "..";
+        if (getTextWidth(displayName, 2) <= 190) {
+            drawStringCustom(10, y + 4, displayName, colMain, 2);
+        } else {
+            drawStringFit(10, y + 8, displayName, colMain, 190, 1);
         }
-        drawStringCustom(10, y + 4, displayName, colMain, 2);
 
         // MAC (debajo, más pequeño)
         drawStringCustom(10, y + 18, d.mac, colSub, 1);

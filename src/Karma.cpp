@@ -272,7 +272,7 @@ static bool runProbeCaptureFase() {
 
         // Counter
         if (scanCount != lastDrawnCount) {
-            tft.fillRect(10, 135, 300, 60, TFT_BLACK);
+            tft.fillRect(10, 135, 300, 78, TFT_BLACK);
             drawStringCustom(10, 135, "SSIDs unicos: ", UI_MAIN, 1);
             drawStringCustom(10, 150, String(scanCount), TFT_GREEN, 3);
 
@@ -288,7 +288,7 @@ static bool runProbeCaptureFase() {
                 for (int i = 0; i < show; i++) {
                     int realIdx = scanCount - 1 - i;
                     String s = String(scanSSIDs[realIdx]);
-                    if (s.length() > 28) s = s.substring(0, 26) + "..";
+                    drawStringFit(75, yPreview + i * 10, s, UI_MAIN, 235, 1);
                     // No podemos dibujar ahí, ya está fuera del área limpia
                 }
             }
@@ -364,8 +364,7 @@ static void drawAttackStats() {
     tft.fillRect(10, 187, 300, 14, TFT_BLACK);
     if (karmaCurrentIdx < karmaCount) {
         String s = String(karmaSSIDs[karmaCurrentIdx]);
-        if (s.length() > 30) s = s.substring(0, 28) + "..";
-        drawStringCustom(10, 188, s, UI_SELECT, 1);
+        drawStringFit(10, 188, s, UI_SELECT, 300, 1);
     }
 }
 
@@ -517,8 +516,7 @@ void runKarma() {
     int show = karmaCount > 4 ? 4 : karmaCount;
     for (int i = 0; i < show; i++) {
         String s = String(karmaSSIDs[i]);
-        if (s.length() > 30) s = s.substring(0, 28) + "..";
-        drawStringCustom(20, 165 + i * 12, "- " + s, UI_MAIN, 1);
+        drawStringFit(20, 165 + i * 12, "- " + s, UI_MAIN, 290, 1);
     }
 
     tft.drawFastHLine(0, 215, 320, UI_ACCENT);

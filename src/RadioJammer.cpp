@@ -178,8 +178,6 @@ static void runChannelJammer() {
     // attackMode: 0=OFF, 1=TURBO (concentrado), 2=WIDE (±2 canales)
     int     attackMode = 0;
     bool    exitMode   = false;
-    int     sel        = 0;   // 0=foco canal, 1=foco BACK
-
     const char* modeLabels[] = { "OFF", "TURBO", "WIDE" };
     const uint16_t modeColors[] = { TFT_GREEN, TFT_RED, TFT_ORANGE };
 
@@ -200,8 +198,8 @@ static void runChannelJammer() {
             drawStringCustom(10, 10, "WIDE  JAM!", TFT_WHITE, 3);
 
         // Canal seleccionado
-        uint16_t chBg = (sel == 0 && attackMode == 0) ? TFT_WHITE : TFT_BLACK;
-        uint16_t chFg = (sel == 0 && attackMode == 0) ? TFT_BLACK : TFT_YELLOW;
+        uint16_t chBg = (attackMode == 0) ? TFT_WHITE : TFT_BLACK;
+        uint16_t chFg = (attackMode == 0) ? TFT_BLACK : TFT_YELLOW;
         tft.fillRect(5, 50, 310, 28, chBg);
         drawStringCustom(10, 56,
             "CH " + String(jamChannel) + "  " +
@@ -223,18 +221,9 @@ static void runChannelJammer() {
             drawStringCustom(10, 132, "Cubre ~10 MHz de ancho.", TFT_ORANGE, 1);
         }
 
-        // Botón BACK (visible solo si no ataca)
-        if (attackMode == 0) {
-            uint16_t bBg = (sel == 1) ? TFT_WHITE : TFT_BLACK;
-            uint16_t bFg = (sel == 1) ? TFT_BLACK : TFT_WHITE;
-            tft.fillRect(5, 155, 120, 30, bBg);
-            tft.drawRect(5, 155, 120, 30, TFT_WHITE);
-            drawStringCustom(14, 163, "< BACK", bFg, 2);
-        }
-
         tft.drawFastHLine(0, 215, 320, TFT_WHITE);
         if (attackMode == 0)
-            drawStringCustom(5, 220, "UP/DOWN:CANAL/NAV  OK:SELEC", UI_ACCENT, 1);
+            drawStringCustom(5, 220, "OK:MODO  OK(HOLD):BACK", UI_ACCENT, 1);
         else
             drawStringCustom(5, 220, "UP/DOWN:CANAL  OK:CAMBIAR MODO", UI_ACCENT, 1);
     };
@@ -245,43 +234,29 @@ static void runChannelJammer() {
 
         // ── UP ──────────────────────────────────────────────────────────────
         if (digitalRead(BTN_UP) == LOW) {
-            if (sel == 1) {
-                sel = 0;          // BACK → foco canal
-            } else if (jamChannel < 13) {
-                jamChannel++;
-            }
+            jamChannel = (jamChannel == 13) ? 1 : jamChannel + 1;
             redraw();
             delay(200);
         }
 
         // ── DOWN ─────────────────────────────────────────────────────────────
         if (digitalRead(BTN_DOWN) == LOW) {
-            if (attackMode > 0) {
-                // Atacando: DOWN baja canal
-                if (jamChannel > 1) jamChannel--;
-            } else if (sel == 0 && jamChannel > 1) {
-                jamChannel--;
-            } else if (sel == 0 && jamChannel == 1) {
-                sel = 1;          // canal mínimo sin atacar → mover a BACK
-            }
+            jamChannel = (jamChannel == 1) ? 13 : jamChannel - 1;
             redraw();
             delay(200);
         }
 
         // ── OK ───────────────────────────────────────────────────────────────
         if (digitalRead(BTN_OK) == LOW) {
-            if (sel == 1 && attackMode == 0) {
-                // BACK seleccionado
+            bool held = waitOkReleaseWasLong();
+            if (held) {
                 exitMode = true;
                 delay(200);
                 break;
-            } else {
-                // Ciclar modo: OFF → TURBO → WIDE → OFF
-                attackMode = (attackMode + 1) % 3;
-                sel = 0;
-                redraw();
-                delay(300);
             }
+            attackMode = (attackMode + 1) % 3;
+            redraw();
+            delay(300);
         }
 
         // ── ATAQUE ───────────────────────────────────────────────────────────
@@ -301,7 +276,6 @@ static void runChannelJammer() {
 static void runSweepJammer() {
     bool isAttacking = false;
     bool exitMode    = false;
-    int  sel         = 0;   // 0=INICIAR, 1=BACK
     int  sweepIdx    = 0;
     int  animCtr     = 0;
 
@@ -323,20 +297,14 @@ static void runSweepJammer() {
             drawStringCustom(10, 55, "WiFi 2.4GHz + Bluetooth", TFT_WHITE, 2);
             drawStringCustom(10, 80, "ESTADO: LISTO", TFT_GREEN, 2);
 
-            uint16_t iBg = (sel == 0) ? TFT_WHITE : TFT_BLACK;
-            tft.fillRect(5, 115, 140, 30, iBg);
+            tft.fillRect(5, 115, 140, 30, TFT_WHITE);
             tft.drawRect(5, 115, 140, 30, TFT_WHITE);
-            drawStringCustom(14, 123, ">> INICIAR", sel == 0 ? TFT_BLACK : TFT_WHITE, 2);
-
-            uint16_t bBg = (sel == 1) ? TFT_WHITE : TFT_BLACK;
-            tft.fillRect(5, 155, 120, 30, bBg);
-            tft.drawRect(5, 155, 120, 30, TFT_WHITE);
-            drawStringCustom(14, 163, "< BACK", sel == 1 ? TFT_BLACK : TFT_WHITE, 2);
+            drawStringCustom(14, 123, ">> INICIAR", TFT_BLACK, 2);
         }
 
         tft.drawFastHLine(0, 215, 320, TFT_WHITE);
         drawStringCustom(5, 220,
-            isAttacking ? "OK: PARAR ATAQUE" : "UP/DOWN: MOVER  OK: SELEC",
+            isAttacking ? "OK: PARAR ATAQUE" : "OK:INICIAR  OK(HOLD):BACK",
             UI_ACCENT, 1);
     };
 
@@ -359,26 +327,21 @@ static void runSweepJammer() {
             }
             if (digitalRead(BTN_OK) == LOW) {
                 isAttacking = false;
-                sel = 0;
                 redraw();
                 delay(300);
             }
         } else {
-            if (digitalRead(BTN_UP) == LOW || digitalRead(BTN_DOWN) == LOW) {
-                sel = sel == 0 ? 1 : 0;
-                redraw();
-                delay(200);
-            }
             if (digitalRead(BTN_OK) == LOW) {
-                if (sel == 0) {
+                bool held = waitOkReleaseWasLong();
+                if (held) {
+                    exitMode = true;
+                    delay(200);
+                } else {
                     isAttacking = true;
                     sweepIdx = 0;
                     animCtr  = 0;
                     redraw();
                     delay(400);
-                } else {
-                    exitMode = true;
-                    delay(200);
                 }
             }
             delay(10);
@@ -457,12 +420,8 @@ static void drawModeMenu(int sel) {
     tft.drawRect( 10, 134, 300, 36, TFT_WHITE);
     drawStringCustom(20, 142, "3. DIAGNOSTICO NRF", sel == 2 ? TFT_BLACK : TFT_WHITE, 2);
 
-    tft.fillRect(10, 176, 300, 30, sel == 3 ? TFT_WHITE : TFT_BLACK);
-    tft.drawRect( 10, 176, 300, 30, TFT_WHITE);
-    drawStringCustom(20, 184, "< BACK AL MENU PRINCIPAL", sel == 3 ? TFT_BLACK : TFT_WHITE, 2);
-
     tft.drawFastHLine(0, 212, 320, TFT_WHITE);
-    drawStringCustom(10, 218, "UP/DOWN: MOVER   OK: ENTRAR", UI_ACCENT, 1);
+    drawStringCustom(10, 218, "OK:ENTRAR  OK(HOLD):BACK", UI_ACCENT, 1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -490,23 +449,26 @@ void runRadioJammer() {
 
         while (!menuDone) {
             if (digitalRead(BTN_UP) == LOW) {
-                menuSel = (menuSel == 0) ? 3 : menuSel - 1;
+                menuSel = (menuSel == 0) ? 2 : menuSel - 1;
                 drawModeMenu(menuSel);
                 delay(200);
             }
             if (digitalRead(BTN_DOWN) == LOW) {
-                menuSel = (menuSel == 3) ? 0 : menuSel + 1;
+                menuSel = (menuSel == 2) ? 0 : menuSel + 1;
                 drawModeMenu(menuSel);
                 delay(200);
             }
             if (digitalRead(BTN_OK) == LOW) {
+                if (waitOkReleaseWasLong()) {
+                    exitJammer = true;
+                }
                 menuDone = true;
                 delay(300);
             }
             delay(10);
         }
 
-        if      (menuSel == 3) exitJammer = true;
+        if      (exitJammer) break;
         else if (menuSel == 2) runDiagnostics();
         else if (menuSel == 0) runChannelJammer();
         else                   runSweepJammer();

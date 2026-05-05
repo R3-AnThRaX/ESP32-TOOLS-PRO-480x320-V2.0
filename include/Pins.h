@@ -1,5 +1,6 @@
-// Pins.h
 #pragma once
+
+#include <Arduino.h>
 
 // Shared SPI bus: TFT + nRF24 #1 + nRF24 #2
 #define SCK_PIN   18
@@ -28,6 +29,18 @@
 #define BTN_UP    32
 #define BTN_OK    33
 #define BTN_DOWN  25
+
+#define OK_LONGPRESS_MS 650
+
+static inline bool waitOkReleaseWasLong(unsigned long holdMs = OK_LONGPRESS_MS) {
+    unsigned long start = millis();
+    bool wasLong = false;
+    while (digitalRead(BTN_OK) == LOW) {
+        if (millis() - start >= holdMs) wasLong = true;
+        delay(5);
+    }
+    return wasLong;
+}
 
 // No buzzer pin was assigned in this wiring. GPIO 22 is TFT DC and GPIO 13 is
 // TFT LED, so sound is disabled unless a free GPIO is assigned here later.

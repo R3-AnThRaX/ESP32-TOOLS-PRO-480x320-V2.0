@@ -108,8 +108,7 @@ static bool tryAutoConnect() {
     tft.drawFastHLine(0, 30, 320, UI_ACCENT);
 
     drawStringCustom(10, 50, "Conectando a red guardada:", UI_MAIN, 1);
-    String ssidDisp = ssid;
-    if (ssidDisp.length() > 30) ssidDisp = ssidDisp.substring(0, 28) + "..";
+    String ssidDisp = truncateToWidth(ssid, 300, 1, FONT_BIG);
     drawStringBig(10, 70, ssidDisp, UI_SELECT, 1);
 
     drawStringCustom(10, 100, "OK(HOLD): cancelar y elegir otra", UI_ACCENT, 1);
@@ -141,7 +140,7 @@ static bool tryAutoConnect() {
 
             drawStringBig(80, 70, "CONECTADO", TFT_GREEN, 2);
             drawStringCustom(10, 110, "Red:", UI_ACCENT, 1);
-            drawStringCustom(50, 110, ssidDisp, UI_MAIN, 1);
+            drawStringFit(50, 110, ssid, UI_MAIN, 260, 1);
             drawStringCustom(10, 124, "IP:", UI_ACCENT, 1);
             drawStringCustom(50, 124, WiFi.localIP().toString(), UI_MAIN, 1);
 
@@ -190,7 +189,7 @@ static bool tryAutoConnect() {
     tft.drawRect(0, 0, 320, 240, TFT_RED);
     drawStringBig(40, 70, "FALLO CONEXION", TFT_RED, 2);
     drawStringCustom(20, 120, "No se pudo conectar a:", UI_MAIN, 1);
-    drawStringCustom(20, 134, ssidDisp, UI_ACCENT, 1);
+    drawStringFit(20, 134, ssid, UI_ACCENT, 280, 1);
     drawStringCustom(20, 160, "Posibles causas:", UI_ACCENT, 1);
     drawStringCustom(30, 174, "- Password cambio", UI_ACCENT, 1);
     drawStringCustom(30, 186, "- Red fuera de alcance", UI_ACCENT, 1);
@@ -284,7 +283,7 @@ static void scanNetworksFn() {
 static int selectNetwork() {
     int cursor = 0;
     int scrollOffset = 0;
-    int total = scanNetCount + 2;   // +2 = RESCAN + CANCEL
+    int total = scanNetCount + 1;   // +1 = RESCAN
 
     auto draw = [&]() {
         tft.fillScreen(TFT_BLACK);
@@ -309,12 +308,13 @@ static int selectNetwork() {
 
             if (idx == scanNetCount) {
                 drawStringCustom(15, y + 10, "RESCAN", col1, 2);
-            } else if (idx == scanNetCount + 1) {
-                drawStringCustom(15, y + 10, "< CANCEL", col1, 2);
             } else {
                 String s = scanNetworks[idx].ssid;
-                if (s.length() > 22) s = s.substring(0, 20) + "..";
-                drawStringCustom(10, y + 4, s, col1, 2);
+                if (getTextWidth(s, 2) <= 245) {
+                    drawStringCustom(10, y + 4, s, col1, 2);
+                } else {
+                    drawStringFit(10, y + 7, s, col1, 245, 1);
+                }
 
                 String meta = encTypeStr(scanNetworks[idx].auth) +
                               "  CH" + String(scanNetworks[idx].channel) +
@@ -343,7 +343,7 @@ static int selectNetwork() {
         }
 
         tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-        drawStringCustom(10, 222, "UP/DN:NAV   OK:SELECT", UI_ACCENT, 1);
+        drawStringCustom(10, 222, "OK:SELECT  OK(HOLD):BACK", UI_ACCENT, 1);
     };
     draw();
 
@@ -367,11 +367,11 @@ static int selectNetwork() {
             delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 40);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 40);
             delay(100);
+            if (held) return -2;                    // CANCEL
             if (cursor == scanNetCount) return -1;       // RESCAN
-            if (cursor == scanNetCount + 1) return -2;   // CANCEL
             return cursor;
         }
         delay(20);
@@ -389,8 +389,7 @@ static bool connectWithCredentials(const String& ssid, const String& pass) {
     tft.drawFastHLine(0, 30, 320, UI_ACCENT);
 
     drawStringCustom(10, 50, "Conectando a:", UI_MAIN, 1);
-    String ssidDisp = ssid;
-    if (ssidDisp.length() > 30) ssidDisp = ssidDisp.substring(0, 28) + "..";
+    String ssidDisp = truncateToWidth(ssid, 300, 1, FONT_BIG);
     drawStringBig(10, 70, ssidDisp, UI_SELECT, 1);
 
     int barX = 10, barY = 180, barW = 300, barH = 14;
@@ -408,7 +407,7 @@ static bool connectWithCredentials(const String& ssid, const String& pass) {
             tft.drawRect(0, 0, 320, 240, UI_MAIN);
             drawStringBig(80, 70, "CONECTADO!", TFT_GREEN, 2);
             drawStringCustom(10, 120, "Red:", UI_ACCENT, 1);
-            drawStringCustom(50, 120, ssidDisp, UI_MAIN, 1);
+            drawStringFit(50, 120, ssid, UI_MAIN, 260, 1);
             drawStringCustom(10, 140, "IP:", UI_ACCENT, 1);
             drawStringCustom(50, 140, WiFi.localIP().toString(), UI_MAIN, 1);
             drawStringCustom(10, 160, "Credenciales guardadas.",

@@ -205,10 +205,7 @@ static void drawHeader(const String& title, const String& subtitle) {
     // Title
     drawStringBig(10, 8, title, UI_MAIN, 1);
 
-    // Subtitle (truncado)
-    String sub = subtitle;
-    if (sub.length() > 38) sub = sub.substring(0, 36) + "..";
-    drawStringCustom(10, 30, sub, UI_ACCENT, 1);
+    drawStringFit(10, 30, subtitle, UI_ACCENT, 300, 1);
 
     tft.drawFastHLine(0, 50, 320, UI_ACCENT);
 }

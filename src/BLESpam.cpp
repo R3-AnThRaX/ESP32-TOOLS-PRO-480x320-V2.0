@@ -306,15 +306,9 @@ static void drawModeMenu(int cursor) {
         drawStringCustom(15, y + 2, MODE_NAMES[i], fg, 2);
     }
 
-    // BACK
-    int backY = 42 + MODE_COUNT * 24;
-    bool backSel = (cursor == MODE_COUNT);
-    if (backSel) tft.fillRect(5, backY - 2, 310, 20, UI_SELECT);
-    drawStringCustom(15, backY + 2, "< BACK", backSel ? UI_BG : UI_MAIN, 2);
-
     // Footer
     tft.drawFastHLine(0, 215, 320, UI_ACCENT);
-    drawStringCustom(10, 222, "UP/DN:NAV   OK:START", UI_ACCENT, 1);
+    drawStringCustom(10, 222, "OK:START   OK(HOLD):BACK", UI_ACCENT, 1);
 }
 
 // Devuelve -1 si el usuario cancela; si no, el modo elegido (0..4)
@@ -324,22 +318,22 @@ static int selectMode() {
 
     while (true) {
         if (digitalRead(BTN_UP) == LOW) {
-            cursor = (cursor - 1 + MODE_COUNT + 1) % (MODE_COUNT + 1);
+            cursor = (cursor - 1 + MODE_COUNT) % MODE_COUNT;
             beep(2100, 20);
             drawModeMenu(cursor);
             delay(180);
         }
         if (digitalRead(BTN_DOWN) == LOW) {
-            cursor = (cursor + 1) % (MODE_COUNT + 1);
+            cursor = (cursor + 1) % MODE_COUNT;
             beep(2100, 20);
             drawModeMenu(cursor);
             delay(180);
         }
         if (digitalRead(BTN_OK) == LOW) {
-            beep(1800, 50);
-            while (digitalRead(BTN_OK) == LOW) delay(5);
+            bool held = waitOkReleaseWasLong();
+            beep(held ? 1000 : 1800, 50);
             delay(100);
-            if (cursor == MODE_COUNT) return -1;  // BACK
+            if (held) return -1;
             return cursor;
         }
         delay(20);
@@ -389,8 +383,7 @@ static void drawAttackStats(unsigned long pkts, float rate) {
 
     // Current device
     String cd = currentDeviceName;
-    if (cd.length() > 18) cd = cd.substring(0, 16) + "..";
-    drawStringCustom(130, 100, cd, TFT_YELLOW, 1);
+    drawStringFit(130, 100, cd, TFT_YELLOW, 180, 1);
 
     // Rate
     char rateBuf[24];

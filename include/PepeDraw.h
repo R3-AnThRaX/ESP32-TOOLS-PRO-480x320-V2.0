@@ -16,9 +16,9 @@
 // ── Colores de UI ─────────────────────────────────────────────────────────
 #define UI_MAIN    TFT_WHITE
 #define UI_BG      TFT_BLACK
-#define UI_ACCENT  0x7BEF   // Gris
+#define UI_ACCENT  TFT_WHITE
 #define UI_CURSOR  TFT_WHITE
-#define UI_SELECT  0xFA20   // Naranja-rojo fuerte (highlight al seleccionar)
+#define UI_SELECT  TFT_WHITE
 
 extern DisplayTFT tft;
 
@@ -47,6 +47,14 @@ int  getTextWidth(const String& txt, int size, FontType font = FONT_SMALL);
 
 // Altura en píxeles de la fuente (para calcular posiciones verticales)
 int  getFontHeight(int size, FontType font = FONT_SMALL);
+
+// Recorta texto para que quepa dentro de maxWidth pixeles y agrega "..".
+String truncateToWidth(const String& txt, int maxWidth,
+                       int size, FontType font = FONT_SMALL);
+
+// Dibuja texto recortado a un ancho maximo.
+void drawStringFit(int x, int y, const String& txt, uint16_t color,
+                   int maxWidth, int size, FontType font = FONT_SMALL);
 
 // Dibuja centrado horizontalmente en la pantalla (ancho 320)
 void drawStringCentered(int y, const String& txt, uint16_t color,
