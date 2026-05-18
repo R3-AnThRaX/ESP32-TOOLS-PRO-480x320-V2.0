@@ -30,6 +30,16 @@
 #define BTN_OK    33
 #define BTN_DOWN  25
 
+// M5Stack IR Unit, verified with this module:
+// module OUT is driven from ESP32 for TX, module IN is read by ESP32 for RX.
+#define IR_TX_PIN 26
+#define IR_RX_PIN 34
+
+// CC1101 sub-GHz radio, sharing the SPI bus with TFT and nRF24 modules.
+#define CC1101_CSN_PIN  21
+#define CC1101_GDO0_PIN 35
+#define CC1101_GDO2_PIN -1
+
 #define OK_LONGPRESS_MS 650
 
 static inline bool waitOkReleaseWasLong(unsigned long holdMs = OK_LONGPRESS_MS) {

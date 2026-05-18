@@ -6,6 +6,7 @@
 #include "WifiScanner.h"
 #include "RadioScanner.h"
 #include "RadioJammer.h"
+#include "SignalTools.h"
 #include "PacketMonitor.h"
 #include "SettingsMenu.h"
 #include "SystemInfo.h"
@@ -378,7 +379,8 @@ static void handlerWifi() {
 static void handlerRadio() {
     static const char* radioItems[] = {
         "Jammer",
-        "Spectrum"
+        "Spectrum",
+        "Signal Tools"
     };
 
     bool exitSub = false;
@@ -389,6 +391,7 @@ static void handlerRadio() {
             case -1: exitSub = true;       break;
             case  0: runRadioJammer();     break;
             case  1: runRadioScanner();    break;
+            case  2: runSignalTools();      break;
         }
     }
 }

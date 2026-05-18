@@ -51,6 +51,12 @@ void setup() {
     pinMode(NRF2_CE_PIN, OUTPUT);
     digitalWrite(NRF2_CE_PIN, LOW);
 
+    pinMode(IR_TX_PIN, INPUT);
+    pinMode(IR_RX_PIN, INPUT);
+    pinMode(CC1101_CSN_PIN, OUTPUT);
+    digitalWrite(CC1101_CSN_PIN, HIGH);
+    pinMode(CC1101_GDO0_PIN, INPUT);
+
     pinMode(TFT_LED_PIN, OUTPUT);
     digitalWrite(TFT_LED_PIN, HIGH);
 
