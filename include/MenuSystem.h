@@ -32,6 +32,7 @@ void runMainMenu();
 // Submenu tipo lista (scroll vertical). Devuelve:
 //   · -1 si el usuario eligió BACK o mantuvo OK
 //   · índice 0..count-1 del item seleccionado
-int  runSubMenu(const char* title, const char* items[], int count);
+int  runSubMenu(const char* title, const char* items[], int count,
+                bool rememberCursor = true);
 
 #endif

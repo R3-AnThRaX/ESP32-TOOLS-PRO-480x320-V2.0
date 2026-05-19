@@ -22,6 +22,8 @@
 #include "ClockWeather.h"
 #include "About.h"
 
+#include <string.h>
+
 static constexpr uint16_t MOD_BG     = TFT_BLACK;
 static constexpr uint16_t MOD_TEXT   = TFT_WHITE;
 static constexpr uint16_t MOD_LINE   = TFT_WHITE;
@@ -44,6 +46,36 @@ static void handlerRadio();
 static void handlerBT();
 static void handlerMonitor();
 static void handlerSystem();
+
+struct SubMenuCursorMemory {
+    const char* title;
+    int cursor;
+};
+
+static SubMenuCursorMemory submenuCursorMemory[16];
+
+static int findSubMenuCursorSlot(const char* title, bool create) {
+    if (!title) return -1;
+
+    int emptySlot = -1;
+    for (int i = 0; i < 16; i++) {
+        if (!submenuCursorMemory[i].title) {
+            if (emptySlot < 0) emptySlot = i;
+            continue;
+        }
+        if (strcmp(submenuCursorMemory[i].title, title) == 0) {
+            return i;
+        }
+    }
+
+    if (create && emptySlot >= 0) {
+        submenuCursorMemory[emptySlot].title = title;
+        submenuCursorMemory[emptySlot].cursor = 0;
+        return emptySlot;
+    }
+
+    return -1;
+}
 
 static const MainMenuEntry MAIN_ENTRIES[] = {
     { "WIFI",      "Scanner / portal", ICON_WIFI,      handlerWifi    },
@@ -492,14 +524,21 @@ void runMainMenu() {
     }
 }
 
-int runSubMenu(const char* title, const char* items[], int count) {
+int runSubMenu(const char* title, const char* items[], int count,
+               bool rememberCursor) {
     const int VISIBLE = 5;
     const int LINE_H = 30;
     const int LIST_Y = 50;
 
+    if (count <= 0) return -1;
+
     int totalItems = count;
-    int cursor = 0;
+    int memorySlot = rememberCursor ? findSubMenuCursorSlot(title, true) : -1;
+    int cursor = (memorySlot >= 0) ? submenuCursorMemory[memorySlot].cursor : 0;
+    if (cursor < 0) cursor = 0;
+    if (cursor >= totalItems) cursor = totalItems - 1;
     int scrollOffset = 0;
+    if (cursor >= VISIBLE) scrollOffset = cursor - VISIBLE + 1;
     int result = -2;
     unsigned long lastPress = 0;
 
@@ -589,6 +628,10 @@ int runSubMenu(const char* title, const char* items[], int count) {
 
     while (digitalRead(BTN_OK) == LOW) delay(5);
     delay(60);
+
+    if (memorySlot >= 0) {
+        submenuCursorMemory[memorySlot].cursor = cursor;
+    }
 
     return result;
 }

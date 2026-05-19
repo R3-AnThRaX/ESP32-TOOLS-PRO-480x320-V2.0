@@ -7,6 +7,7 @@
 #include "PepeDraw.h"
 #include "Pins.h"
 #include "SoundUtils.h"
+#include "IrAnalyzer.h"
 #include "VirtualKeyboard.h"
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -335,6 +336,25 @@ static bool deleteSavedIrSlot(uint8_t slot) {
     return true;
 }
 
+static bool renameSavedIrSlot(uint8_t slot, const String& requestedName) {
+    if (slot >= IR_SAVE_MAX) return false;
+
+    String name = requestedName;
+    name.trim();
+    if (name.length() == 0) return false;
+    if (name.length() > IR_SAVE_NAME_MAX) {
+        name = name.substring(0, IR_SAVE_NAME_MAX);
+    }
+
+    Preferences prefs;
+    if (!prefs.begin(IR_SAVE_NAMESPACE, false)) return false;
+
+    String nameKey = irSaveKey('n', slot);
+    bool ok = (prefs.putString(nameKey.c_str(), name) > 0);
+    prefs.end();
+    return ok;
+}
+
 static bool saveCurrentIrCapture(const String& requestedName, int* savedSlot) {
     if (savedSlot) *savedSlot = -2;
     if (lastIrRawCount == 0) return false;
@@ -460,28 +480,60 @@ static bool runIrCaptureActions() {
     }
 }
 
+static bool confirmDeleteIrSlot(const String& name) {
+    static const char* actions[] = {
+        "Cancel",
+        "Delete"
+    };
+
+    drawToolFrame("DELETE IR");
+    drawStringCustom(20,  58, "Delete saved signal?", TFT_YELLOW, 1);
+    drawStringCustom(20,  78, name, TFT_WHITE, 2);
+    delay(350);
+
+    int choice = runSubMenu("DELETE IR", actions,
+                            sizeof(actions) / sizeof(char*), false);
+    return choice == 1;
+}
+
+static void promptAndRenameSavedIrSlot(uint8_t slot, const String& currentName) {
+    String name = virtualKeyboardInput("IR RENAME", currentName,
+                                       IR_SAVE_NAME_MAX, false);
+    name.trim();
+    if (name.length() == 0) {
+        showIrMessage("IR RENAME", "CANCELED", "", TFT_YELLOW);
+        return;
+    }
+
+    if (renameSavedIrSlot(slot, name)) {
+        showIrMessage("IR RENAME", "RENAMED", name, TFT_GREEN);
+    } else {
+        showIrMessage("IR RENAME", "RENAME FAILED", "", TFT_RED);
+    }
+}
+
 static void runSavedIrSlot(uint8_t slot) {
     static const char* actions[] = {
         "Replay",
         "Load as Last",
+        "Rename",
         "Delete",
         "Back"
     };
 
     while (true) {
         String name;
-        uint16_t count = 0;
-        if (!loadSavedIrSlot(slot, &name, nullptr, &count)) {
+        if (!loadSavedIrSlot(slot, &name, nullptr, nullptr)) {
             showIrMessage("SAVED IR", "NOT FOUND",
                           "This slot is empty now.", TFT_RED);
             return;
         }
 
-        int choice = runSubMenu("SAVED IR", actions,
+        int choice = runSubMenu("IR OPTIONS", actions,
                                 sizeof(actions) / sizeof(char*));
         switch (choice) {
             case -1:
-            case  3:
+            case  4:
                 return;
             case  0:
                 if (loadSavedIrToLast(slot, &name)) {
@@ -500,12 +552,18 @@ static void runSavedIrSlot(uint8_t slot) {
                 }
                 break;
             case  2:
-                if (deleteSavedIrSlot(slot)) {
-                    showIrMessage("SAVED IR", "DELETED", name, TFT_GREEN);
-                } else {
-                    showIrMessage("SAVED IR", "DELETE FAILED", "", TFT_RED);
+                promptAndRenameSavedIrSlot(slot, name);
+                break;
+            case  3:
+                if (confirmDeleteIrSlot(name)) {
+                    if (deleteSavedIrSlot(slot)) {
+                        showIrMessage("SAVED IR", "DELETED", name, TFT_GREEN);
+                    } else {
+                        showIrMessage("SAVED IR", "DELETE FAILED", "", TFT_RED);
+                    }
+                    return;
                 }
-                return;
+                break;
         }
     }
 }
@@ -792,6 +850,7 @@ void runSignalTools() {
     static const char* items[] = {
         "Hardware Diag",
         "Input Monitor",
+        "IR Analyzer",
         "IR Raw Capture",
         "IR Replay Last",
         "Saved IR",
@@ -806,10 +865,11 @@ void runSignalTools() {
             case -1: exitSub = true;      break;
             case  0: runHardwareDiag();   break;
             case  1: runInputMonitor();   break;
-            case  2: runIrRawCapture();   break;
-            case  3: runIrReplayLast();   break;
-            case  4: runSavedIrCaptures(); break;
-            case  5: runIrTxTest();       break;
+            case  2: runIrAnalyzer();     break;
+            case  3: runIrRawCapture();   break;
+            case  4: runIrReplayLast();   break;
+            case  5: runSavedIrCaptures(); break;
+            case  6: runIrTxTest();       break;
         }
     }
 
