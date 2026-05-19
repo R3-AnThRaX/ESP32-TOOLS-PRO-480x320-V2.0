@@ -1,11 +1,13 @@
 #include "SignalTools.h"
 
+#include <Preferences.h>
 #include <SPI.h>
 
 #include "MenuSystem.h"
 #include "PepeDraw.h"
 #include "Pins.h"
 #include "SoundUtils.h"
+#include "VirtualKeyboard.h"
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CC1101 register addresses and command strobes
@@ -38,6 +40,9 @@ static constexpr uint32_t IR_CAPTURE_MAX_US    = 180000;
 static constexpr uint32_t IR_MIN_PULSE_US      = 250;
 static constexpr uint32_t IR_START_MIN_US      = 1800;
 static constexpr uint32_t IR_START_MAX_US      = 20000;
+static constexpr uint8_t  IR_SAVE_MAX          = 6;
+static constexpr uint8_t  IR_SAVE_NAME_MAX     = 14;
+static constexpr const char* IR_SAVE_NAMESPACE = "irsignals";
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Module state
@@ -73,10 +78,12 @@ static void    drawIrRawPreview(uint16_t count, bool overflow);
 static bool    captureIrRaw();
 static void    waitOkReleased();
 
+static bool    runIrCaptureActions();
 static void    runHardwareDiag();
 static void    runInputMonitor();
 static void    runIrRawCapture();
 static void    runIrReplayLast();
+static void    runSavedIrCaptures();
 static void    runIrTxTest();
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -251,6 +258,288 @@ static void drawIrRawPreview(uint16_t count, bool overflow) {
 // ═══════════════════════════════════════════════════════════════════════════
 //  IR raw capture
 // ═══════════════════════════════════════════════════════════════════════════
+static void showIrMessage(const char* title, const String& line1,
+                          const String& line2, uint16_t color) {
+    drawToolFrame(title);
+    drawStringCustom(24,  82, line1, color, 2);
+    if (line2.length() > 0) {
+        drawStringCustom(22, 116, line2, TFT_WHITE, 1);
+    }
+    while (digitalRead(BTN_OK) == HIGH) delay(20);
+    waitOkReleased();
+}
+
+// Keep IR captures in their own small NVS namespace. Each slot stores:
+// name, timing count, and the raw uint16_t timing buffer.
+static String irSaveKey(char prefix, uint8_t slot) {
+    char key[5];
+    snprintf(key, sizeof(key), "%c%02u", prefix, slot);
+    return String(key);
+}
+
+static bool loadSavedIrSlot(uint8_t slot, String* name,
+                            uint16_t* raw, uint16_t* count) {
+    if (slot >= IR_SAVE_MAX) return false;
+
+    Preferences prefs;
+    if (!prefs.begin(IR_SAVE_NAMESPACE, true)) return false;
+
+    String nameKey  = irSaveKey('n', slot);
+    String countKey = irSaveKey('c', slot);
+    String dataKey  = irSaveKey('d', slot);
+
+    uint32_t storedCount = prefs.getUInt(countKey.c_str(), 0);
+    size_t expectedLen = storedCount * sizeof(uint16_t);
+    bool ok = false;
+
+    if (storedCount > 0 && storedCount <= IR_RAW_MAX &&
+        prefs.getBytesLength(dataKey.c_str()) == expectedLen) {
+        ok = true;
+        if (raw) {
+            ok = (prefs.getBytes(dataKey.c_str(), raw, expectedLen) == expectedLen);
+        }
+        if (ok) {
+            if (count) *count = static_cast<uint16_t>(storedCount);
+            if (name) {
+                *name = prefs.getString(nameKey.c_str(),
+                                        String("IR ") + String(slot + 1));
+                name->trim();
+                if (name->length() == 0) {
+                    *name = String("IR ") + String(slot + 1);
+                }
+            }
+        }
+    }
+
+    prefs.end();
+    return ok;
+}
+
+static int findFirstEmptyIrSlot() {
+    for (uint8_t slot = 0; slot < IR_SAVE_MAX; slot++) {
+        if (!loadSavedIrSlot(slot, nullptr, nullptr, nullptr)) return slot;
+    }
+    return -1;
+}
+
+static bool deleteSavedIrSlot(uint8_t slot) {
+    if (slot >= IR_SAVE_MAX) return false;
+
+    Preferences prefs;
+    if (!prefs.begin(IR_SAVE_NAMESPACE, false)) return false;
+
+    prefs.remove(irSaveKey('n', slot).c_str());
+    prefs.remove(irSaveKey('c', slot).c_str());
+    prefs.remove(irSaveKey('d', slot).c_str());
+    prefs.end();
+    return true;
+}
+
+static bool saveCurrentIrCapture(const String& requestedName, int* savedSlot) {
+    if (savedSlot) *savedSlot = -2;
+    if (lastIrRawCount == 0) return false;
+
+    int slot = findFirstEmptyIrSlot();
+    if (slot < 0) {
+        if (savedSlot) *savedSlot = -1;
+        return false;
+    }
+
+    String name = requestedName;
+    name.trim();
+    if (name.length() == 0) return false;
+    if (name.length() > IR_SAVE_NAME_MAX) {
+        name = name.substring(0, IR_SAVE_NAME_MAX);
+    }
+
+    Preferences prefs;
+    if (!prefs.begin(IR_SAVE_NAMESPACE, false)) return false;
+
+    String nameKey  = irSaveKey('n', slot);
+    String countKey = irSaveKey('c', slot);
+    String dataKey  = irSaveKey('d', slot);
+    size_t dataLen = lastIrRawCount * sizeof(uint16_t);
+
+    prefs.remove(nameKey.c_str());
+    prefs.remove(countKey.c_str());
+    prefs.remove(dataKey.c_str());
+
+    bool ok = (prefs.putString(nameKey.c_str(), name) > 0);
+    ok = (prefs.putUInt(countKey.c_str(), lastIrRawCount) > 0) && ok;
+    ok = (prefs.putBytes(dataKey.c_str(), lastIrRaw, dataLen) == dataLen) && ok;
+    prefs.end();
+
+    if (ok && savedSlot) *savedSlot = slot;
+    return ok;
+}
+
+static bool loadSavedIrToLast(uint8_t slot, String* name) {
+    uint16_t count = 0;
+    bool ok = loadSavedIrSlot(slot, name, lastIrRaw, &count);
+    if (ok) {
+        lastIrRawCount = count;
+        lastIrOverflow = false;
+    }
+    return ok;
+}
+
+static void replayLastIrAndWait(const char* title, const String& label) {
+    if (lastIrRawCount == 0) {
+        showIrMessage(title, "NO CAPTURE", "Capture or load a signal first.",
+                      TFT_RED);
+        return;
+    }
+
+    drawToolFrame(title);
+    drawStringCustom(20,  58, label, TFT_CYAN, 1);
+    drawStringCustom(20,  78, "Timings: " + String(lastIrRawCount),
+                     TFT_WHITE, 1);
+    drawStringCustom(20, 104, "Sending once...", TFT_YELLOW, 1);
+
+    sendIrRaw(lastIrRaw, lastIrRawCount);
+    irRxMode();
+
+    drawStringCustom(20, 138, "SENT", TFT_GREEN, 2);
+    while (digitalRead(BTN_OK) == HIGH) delay(20);
+    waitOkReleased();
+}
+
+static void promptAndSaveCurrentIrCapture() {
+    if (lastIrRawCount == 0) {
+        showIrMessage("SAVE IR", "NO CAPTURE", "Capture a signal first.",
+                      TFT_RED);
+        return;
+    }
+
+    String name = virtualKeyboardInput("IR NAME", "Name this capture",
+                                       IR_SAVE_NAME_MAX, false);
+    name.trim();
+    if (name.length() == 0) {
+        showIrMessage("SAVE IR", "CANCELED", "", TFT_YELLOW);
+        return;
+    }
+
+    int slot = -2;
+    if (saveCurrentIrCapture(name, &slot)) {
+        showIrMessage("SAVE IR", "SAVED",
+                      "Slot " + String(slot + 1) + " / " + String(IR_SAVE_MAX),
+                      TFT_GREEN);
+    } else if (slot == -1) {
+        showIrMessage("SAVE IR", "MEMORY FULL",
+                      "Delete a saved capture first.", TFT_RED);
+    } else {
+        showIrMessage("SAVE IR", "SAVE FAILED",
+                      "NVS write did not complete.", TFT_RED);
+    }
+}
+
+static bool runIrCaptureActions() {
+    static const char* actions[] = {
+        "Replay Last",
+        "Save Capture",
+        "Capture Again",
+        "Back"
+    };
+
+    while (true) {
+        int choice = runSubMenu("IR CAPTURE", actions,
+                                sizeof(actions) / sizeof(char*));
+        switch (choice) {
+            case -1:
+            case  3:
+                return false;
+            case  0:
+                replayLastIrAndWait("IR REPLAY", "Last captured signal");
+                break;
+            case  1:
+                promptAndSaveCurrentIrCapture();
+                break;
+            case  2:
+                return true;
+        }
+    }
+}
+
+static void runSavedIrSlot(uint8_t slot) {
+    static const char* actions[] = {
+        "Replay",
+        "Load as Last",
+        "Delete",
+        "Back"
+    };
+
+    while (true) {
+        String name;
+        uint16_t count = 0;
+        if (!loadSavedIrSlot(slot, &name, nullptr, &count)) {
+            showIrMessage("SAVED IR", "NOT FOUND",
+                          "This slot is empty now.", TFT_RED);
+            return;
+        }
+
+        int choice = runSubMenu("SAVED IR", actions,
+                                sizeof(actions) / sizeof(char*));
+        switch (choice) {
+            case -1:
+            case  3:
+                return;
+            case  0:
+                if (loadSavedIrToLast(slot, &name)) {
+                    replayLastIrAndWait("IR REPLAY", name);
+                } else {
+                    showIrMessage("IR REPLAY", "LOAD FAILED", "", TFT_RED);
+                }
+                break;
+            case  1:
+                if (loadSavedIrToLast(slot, &name)) {
+                    showIrMessage("SAVED IR", "LOADED",
+                                  name + " (" + String(lastIrRawCount) + ")",
+                                  TFT_GREEN);
+                } else {
+                    showIrMessage("SAVED IR", "LOAD FAILED", "", TFT_RED);
+                }
+                break;
+            case  2:
+                if (deleteSavedIrSlot(slot)) {
+                    showIrMessage("SAVED IR", "DELETED", name, TFT_GREEN);
+                } else {
+                    showIrMessage("SAVED IR", "DELETE FAILED", "", TFT_RED);
+                }
+                return;
+        }
+    }
+}
+
+static void runSavedIrCaptures() {
+    while (true) {
+        String labels[IR_SAVE_MAX];
+        const char* items[IR_SAVE_MAX];
+        uint8_t slots[IR_SAVE_MAX];
+        int itemCount = 0;
+
+        for (uint8_t slot = 0; slot < IR_SAVE_MAX; slot++) {
+            String name;
+            uint16_t count = 0;
+            if (loadSavedIrSlot(slot, &name, nullptr, &count)) {
+                labels[itemCount] = String(slot + 1) + ": " + name;
+                items[itemCount] = labels[itemCount].c_str();
+                slots[itemCount] = slot;
+                itemCount++;
+            }
+        }
+
+        if (itemCount == 0) {
+            showIrMessage("SAVED IR", "NO SAVED", "Capture and save first.",
+                          TFT_YELLOW);
+            return;
+        }
+
+        int choice = runSubMenu("SAVED IR", items, itemCount);
+        if (choice < 0) return;
+        runSavedIrSlot(slots[choice]);
+    }
+}
+
 static bool captureIrRaw() {
     lastIrRawCount = 0;
     lastIrOverflow = false;
@@ -407,20 +696,28 @@ static void runInputMonitor() {
 }
 
 static void runIrRawCapture() {
-    irRxMode();
+    while (true) {
+        irRxMode();
 
-    drawToolFrame("IR RAW CAPTURE");
-    drawStringCustom(12, 52, "Point remote at IR module.", TFT_CYAN,  1);
-    drawStringCustom(12, 70, "Press a remote button now.", TFT_CYAN,  1);
-    drawStringCustom(12, 92, "Waiting up to 10 seconds...", TFT_WHITE, 1);
+        drawToolFrame("IR RAW CAPTURE");
+        drawStringCustom(12, 52, "Point remote at IR module.", TFT_CYAN,  1);
+        drawStringCustom(12, 70, "Press a remote button now.", TFT_CYAN,  1);
+        drawStringCustom(12, 92, "Waiting up to 10 seconds...", TFT_WHITE, 1);
 
-    bool ok = captureIrRaw();
-    if (!ok) {
-        tft.fillRect(1, 36, 318, 175, TFT_BLACK);
-        drawStringCustom(30,  92, "NO IR FRAME", TFT_RED, 2);
-        drawStringCustom(22, 122, "Try again closer to receiver.", TFT_WHITE, 1);
-    } else {
+        bool ok = captureIrRaw();
+        if (!ok) {
+            tft.fillRect(1, 36, 318, 175, TFT_BLACK);
+            drawStringCustom(30,  92, "NO IR FRAME", TFT_RED, 2);
+            drawStringCustom(22, 122, "Try again closer to receiver.", TFT_WHITE, 1);
+            while (digitalRead(BTN_OK) == HIGH) delay(20);
+            waitOkReleased();
+            return;
+        }
+
         drawIrRawPreview(lastIrRawCount, lastIrOverflow);
+        tft.fillRect(1, 213, 318, 26, TFT_BLACK);
+        drawStringCustom(10, 220, "OK: OPTIONS", TFT_WHITE, 1);
+
         Serial.print("[IR] Raw count=");
         Serial.print(lastIrRawCount);
         Serial.print(" data=");
@@ -429,10 +726,13 @@ static void runIrRawCapture() {
             Serial.print(lastIrRaw[i]);
         }
         Serial.println();
-    }
 
-    while (digitalRead(BTN_OK) == HIGH) delay(20);
-    waitOkReleased();
+        while (digitalRead(BTN_OK) == HIGH) delay(20);
+        waitOkReleased();
+
+        bool captureAgain = runIrCaptureActions();
+        if (!captureAgain) return;
+    }
 }
 
 static void runIrReplayLast() {
@@ -494,6 +794,7 @@ void runSignalTools() {
         "Input Monitor",
         "IR Raw Capture",
         "IR Replay Last",
+        "Saved IR",
         "IR TX Test"
     };
 
@@ -507,7 +808,8 @@ void runSignalTools() {
             case  1: runInputMonitor();   break;
             case  2: runIrRawCapture();   break;
             case  3: runIrReplayLast();   break;
-            case  4: runIrTxTest();       break;
+            case  4: runSavedIrCaptures(); break;
+            case  5: runIrTxTest();       break;
         }
     }
 
