@@ -4,6 +4,11 @@ Firmware multi-herramienta para ESP32 Dev Module con pantalla TFT SPI 480x320. E
 
 > Usa este firmware solo en tus redes, tus dispositivos y entornos donde tengas autorizacion. Varias funciones pueden escanear, transmitir, interferir o copiar senales. El objetivo de este proyecto es aprendizaje, diagnostico y laboratorio propio.
 
+[![GitHub](https://img.shields.io/badge/GitHub-pepeangell5-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/pepeangell5)
+[![Web Flasher](https://img.shields.io/badge/Web%20Flasher-Instalar%20Firmware-00C853?style=for-the-badge&logo=esphome&logoColor=white)](https://pepeangell5.github.io/ESP32-TOOLS-PRO-480x320-V2.0/)
+[![Instagram](https://img.shields.io/badge/Instagram-pepeangelll-E4405F?style=for-the-badge&logo=instagram&logoColor=white)](https://instagram.com/pepeangelll)
+[![Facebook](https://img.shields.io/badge/Facebook-ESP32Tools-1877F2?style=for-the-badge&logo=facebook&logoColor=white)](https://www.facebook.com/esp32tools/)
+
 ## Que cambia frente a V1.0
 
 - Soporte para M5Stack IR Unit con captura, replay, guardado de senales y controles virtuales.
@@ -288,30 +293,51 @@ Los botones usan pull-up interno. Al presionarlos, el pin va a `LOW`.
 ## Diagrama visual de conexiones
 
 ```mermaid
-flowchart LR
-  ESP["ESP32 Dev Module"]
-  TFT["TFT 480x320 ILI9488"]
-  NRF1["nRF24L01 #1"]
-  NRF2["nRF24L01 #2"]
-  IR["M5Stack IR Unit"]
-  CC["CC1101"]
-  BTN["Botones"]
+flowchart TB
+  ESP(("ESP32 Dev Module<br/>centro de conexiones<br/>SPI compartido: 18/23/19<br/>GND comun")):::esp
 
-  ESP -- "GPIO18 SCK" --> TFT
-  ESP -- "GPIO23 MOSI" --> TFT
-  ESP -- "GPIO5 CS / GPIO22 DC / GPIO4 RST / GPIO13 BL" --> TFT
+  TFT["TFT 480x320 ILI9488<br/>SCK GPIO18<br/>MOSI GPIO23<br/>CS GPIO5<br/>DC GPIO22<br/>RST GPIO4<br/>BL GPIO13"]:::display
+  NRF1["nRF24L01 #1<br/>SPI 18/23/19<br/>CE GPIO27<br/>CSN GPIO14<br/>3.3V + GND"]:::radio
+  NRF2["nRF24L01 #2<br/>SPI 18/23/19<br/>CE GPIO17<br/>CSN GPIO16<br/>3.3V + GND"]:::radio
+  IR["M5Stack IR Unit<br/>OUT/TX GPIO26<br/>IN/RX GPIO34<br/>5V + GND"]:::ir
+  CC["CC1101<br/>SPI 18/23/19<br/>CSN GPIO21<br/>GDO0 RX GPIO35<br/>TX opcional GPIO15<br/>3.3V + GND"]:::cc
+  BTN["Botones<br/>UP GPIO32<br/>OK GPIO33<br/>DOWN GPIO25<br/>cada boton a GND"]:::btn
 
-  ESP -- "SPI 18/23/19 + CE27 + CSN14" --> NRF1
-  ESP -- "SPI 18/23/19 + CE17 + CSN16" --> NRF2
+  subgraph ARRIBA[""]
+    direction LR
+    NRF1
+    TFT
+    NRF2
+  end
 
-  ESP -- "GPIO26 TX -> OUT" --> IR
-  IR -- "IN -> GPIO34 RX" --> ESP
+  subgraph CENTRO[""]
+    direction LR
+    IR
+    ESP
+    CC
+  end
 
-  ESP -- "SPI 18/23/19 + CSN21" --> CC
-  CC -- "GDO0 -> GPIO35 RX" --> ESP
-  ESP -. "GPIO15 TX opcional" .-> CC
+  subgraph ABAJO[""]
+    direction LR
+    BTN
+  end
 
-  ESP -- "GPIO32 UP / GPIO33 OK / GPIO25 DOWN" --> BTN
+  ESP --- TFT
+  ESP --- NRF1
+  ESP --- NRF2
+  ESP --- IR
+  ESP --- CC
+  ESP --- BTN
+
+  classDef esp fill:#0f172a,stroke:#38bdf8,stroke-width:3px,color:#ffffff;
+  classDef display fill:#111827,stroke:#f59e0b,stroke-width:2px,color:#ffffff;
+  classDef radio fill:#111827,stroke:#22c55e,stroke-width:2px,color:#ffffff;
+  classDef ir fill:#111827,stroke:#ef4444,stroke-width:2px,color:#ffffff;
+  classDef cc fill:#111827,stroke:#a855f7,stroke-width:2px,color:#ffffff;
+  classDef btn fill:#111827,stroke:#e5e7eb,stroke-width:2px,color:#ffffff;
+  style ARRIBA fill:transparent,stroke:transparent
+  style CENTRO fill:transparent,stroke:transparent
+  style ABAJO fill:transparent,stroke:transparent
 ```
 
 ## Pin map rapido
@@ -345,7 +371,11 @@ ESP32 GPIO25  -> Boton DOWN a GND
 
 ## Web flasher
 
-Cuando GitHub Pages este activo para esta repo, el flasher usara estos archivos:
+Flasheo directo desde navegador:
+
+[https://pepeangell5.github.io/ESP32-TOOLS-PRO-480x320-V2.0/](https://pepeangell5.github.io/ESP32-TOOLS-PRO-480x320-V2.0/)
+
+La pagina usa ESP Web Tools y estos archivos del repo:
 
 - `index.html`: pagina de flasheo con ESP Web Tools.
 - `manifest.json`: manifiesto usado por ESP Web Tools.
@@ -388,3 +418,10 @@ Si la subida falla con error de boot/serial, manten presionado `BOOT` al iniciar
 ## Creditos
 
 Proyecto creado y probado por PepeAngell para ESP32-TOOLS-PRO-480x320-V2.0.
+
+## Redes y enlaces
+
+- GitHub: [github.com/pepeangell5](https://github.com/pepeangell5)
+- Web Flasher: [pepeangell5.github.io/ESP32-TOOLS-PRO-480x320-V2.0](https://pepeangell5.github.io/ESP32-TOOLS-PRO-480x320-V2.0/)
+- Instagram: [@pepeangelll](https://instagram.com/pepeangelll)
+- Facebook: [ESP32Tools](https://www.facebook.com/esp32tools/)
