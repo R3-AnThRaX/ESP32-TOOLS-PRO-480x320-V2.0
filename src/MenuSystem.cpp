@@ -27,6 +27,7 @@
 #include "Karma.h"
 #include "ClockWeather.h"
 #include "About.h"
+#include "WebDashboard.h"
 
 #include <string.h>
 
@@ -475,6 +476,7 @@ static void handlerSystem() {
         "Settings",
         "System Info",
         "Clock & Weather",
+        "Web Dashboard",
         "About"
     };
 
@@ -487,7 +489,8 @@ static void handlerSystem() {
             case  0: runSettings();       break;
             case  1: runSystemInfo();     break;
             case  2: runClockWeather();   break;
-            case  3: runAbout();          break;
+            case  3: runWebDashboard();   break;
+            case  4: runAbout();          break;
         }
     }
 }

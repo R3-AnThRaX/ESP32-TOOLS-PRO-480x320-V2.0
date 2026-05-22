@@ -110,6 +110,8 @@ static constexpr uint8_t  BRUTE_TOP_HITS          = 6;
 
 static SPISettings ccSpi(4000000, MSBFIRST, SPI_MODE0);
 static uint32_t lastFoundFreqKHz = 433920;
+static bool dashboardRxReady = false;
+static uint32_t dashboardRxFreqKHz = 0;
 
 struct CcSnapshot {
     bool ready = false;
@@ -2338,6 +2340,41 @@ static void runCcTestBeacon() {
             delay(10);
         }
     }
+}
+
+bool cc1101DashboardRead(uint32_t freqKHz, CC1101DashboardStatus* out) {
+    if (!out) return false;
+    if (freqKHz < 250000 || freqKHz > 1000000) freqKHz = 433920;
+
+    if (!dashboardRxReady || dashboardRxFreqKHz != freqKHz) {
+        dashboardRxReady = prepareRx(freqKHz);
+        dashboardRxFreqKHz = freqKHz;
+    }
+
+    CcSnapshot snap = readSnapshot();
+    if (!snap.ready) {
+        dashboardRxReady = prepareRx(freqKHz);
+        snap = readSnapshot();
+    }
+
+    out->ready = snap.ready;
+    out->freqKHz = freqKHz;
+    out->partnum = snap.partnum;
+    out->version = snap.version;
+    out->marc = snap.marc;
+    out->pktStatus = snap.pktStatus;
+    out->lqi = snap.lqi;
+    out->rssiRaw = snap.rssiRaw;
+    out->rssiDbm = snap.rssiDbm;
+    out->gdo0 = snap.gdo0;
+    return out->ready;
+}
+
+void cc1101DashboardStop() {
+    initCcPins();
+    ccStrobe(CC_SIDLE);
+    dashboardRxReady = false;
+    pinMode(CC1101_TX_DATA_PIN, INPUT);
 }
 
 

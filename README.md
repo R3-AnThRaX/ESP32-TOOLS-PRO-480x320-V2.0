@@ -27,6 +27,29 @@ Firmware multi-herramienta para ESP32 Dev Module con pantalla TFT SPI 480x320. E
 
 Los modulos RF433T/RF433R no estan integrados en esta version porque el CC1101 cubre mejor el trabajo sub-GHz y permite mas diagnostico desde software.
 
+## Galeria
+
+| Vista | Imagen |
+| --- | --- |
+| Dispositivo terminado | ![ESP32-TOOLS-PRO armado](img/pro1.JPG) |
+| Vista frontal | ![Vista frontal ESP32-TOOLS-PRO](img/pro2.JPG) |
+| Vista lateral | ![Vista lateral ESP32-TOOLS-PRO](img/pro3.JPG) |
+| Vista interna / montaje | ![Montaje ESP32-TOOLS-PRO](img/pro4.JPG) |
+
+## Capturas del firmware
+
+| Menu | Imagen |
+| --- | --- |
+| Splash | ![Splash screen](img/splash.jpg) |
+| Menu principal | ![Menu principal](img/menu.jpg) |
+| WiFi Tools | ![WiFi tools](img/wifi.JPG) |
+| WiFi scanner / canales | ![WiFi tools detalle](img/wifi2.JPG) |
+| Radio Tools | ![Radio tools](img/radio.JPG) |
+| Bluetooth Tools | ![Bluetooth tools](img/bluetooth.JPG) |
+| Packet Monitor | ![Packet monitor](img/packet.JPG) |
+| System Tools | ![System tools](img/system.JPG) |
+| Screensaver | ![Screensaver](img/screensaver.jpg) |
+
 ## Navegacion
 
 - `UP`: subir o cambiar valor.
@@ -114,7 +137,34 @@ Notas CC1101:
 - `Settings`: configuracion del dispositivo y opciones guardadas.
 - `System Info`: informacion de memoria, firmware y estado del ESP32.
 - `Clock & Weather`: reloj/clima con teclado virtual para configuracion.
+- `Web Dashboard`: crea el AP `ESP32-TOOLS-PRO` con password `admin1234` y abre un panel web en `http://192.168.4.1`.
 - `About`: informacion del proyecto.
+
+### Web Dashboard
+
+La fase 1 del dashboard web se activa desde `System > Web Dashboard`. Al entrar, el ESP32 levanta un AP propio:
+
+```text
+SSID: ESP32-TOOLS-PRO
+PASS: admin1234
+URL : http://192.168.4.1
+```
+
+Funciones disponibles en la fase 1:
+
+- Dashboard general con uptime, heap libre, clientes conectados y pines principales.
+- Diagnostico rapido de niveles IR RX y CC1101 GDO0.
+- Lista de capturas IR guardadas con replay, rename y delete.
+- Monitor CC1101 por frecuencia preset: 315.00, 390.00, 433.92, 868.35 y 915.00 MHz.
+- WiFi Tools desde navegador:
+  - `WiFi Scanner`: lista de redes, canal, RSSI, seguridad y BSSID.
+  - `Channel Scan`: resumen por canal y tabla de redes 2.4 GHz.
+  - `WiFi Radar`: selecciona un AP y lo rastrea por RSSI/cercania.
+  - `Direction Finder`: mide frente, derecha, atras e izquierda para sugerir la direccion mas fuerte.
+  - `Beacon Spam`: demo web controlada con SSIDs de laboratorio, canal fijo del dashboard, boton start/stop y auto-stop.
+  - `Deauther`, `Evil Portal`, `Probe Sniffer` y `KARMA Attack` aparecen como `LOCAL ONLY` para usarse desde la pantalla del dispositivo.
+
+El dashboard no ejecuta funciones que toman control completo del WiFi como Deauther, Evil Portal, KARMA o jamming. Es intencional para evitar conflictos con el AP del dashboard y mantenerlo estable.
 
 ## Componentes usados
 
@@ -127,6 +177,25 @@ Notas CC1101:
 | M5Stack IR Unit | Receptor + transmisor infrarrojo | 5V | Cableado verificado con OUT en GPIO26 e IN en GPIO34 |
 | CC1101 | Radio sub-GHz para 315/433/868/915 MHz | 3.3V | No alimentar a 5V |
 | Botones UP/OK/DOWN | Navegacion del firmware | GPIO a GND | Usa `INPUT_PULLUP` interno |
+
+### Imagenes de componentes
+
+| Componente | Imagen |
+| --- | --- |
+| ESP32 Dev Module | ![ESP32](img/componentes/esp32U.png) |
+| Pantalla ILI9488 480x320 | ![Pantalla ILI9488](img/componentes/pantalla9488.png) |
+| Modulos nRF24L01 | ![Dos nRF24L01](img/componentes/2NRF24.png) |
+| nRF24L01 | ![nRF24L01](img/componentes/NRF24.png) |
+| CC1101 | ![CC1101](img/componentes/cc1101.png) |
+| Antena | ![Antena](img/componentes/antena.png) |
+| M5Stack IR Unit | ![IR Unit](img/componentes/IRREMOTE.png) |
+| IR Unit vista 2 | ![IR Unit vista 2](img/componentes/IRREMOTE2.png) |
+| Botones | ![Botones](img/componentes/botones.png) |
+| Bateria | ![Bateria](img/componentes/bateria.png) |
+| TP4056 | ![TP4056](img/componentes/tp4056.png) |
+| Step-up | ![Step-up](img/componentes/stepup.png) |
+| Interruptor | ![Interruptor](img/componentes/interruptor.png) |
+| Placa PCB / montaje | ![Placa PCB](img/componentes/placapcb.png) |
 
 ## Tabla de conexiones
 
@@ -280,7 +349,10 @@ Cuando GitHub Pages este activo para esta repo, el flasher usara estos archivos:
 
 - `index.html`: pagina de flasheo con ESP Web Tools.
 - `manifest.json`: manifiesto usado por ESP Web Tools.
-- `firmware/firmware-merged.bin`: binario completo para flashear desde offset `0x0`.
+- `assets/Firmware/firmware-merged.bin`: binario completo para flashear desde offset `0x0`.
+- `assets/Firmware/firmware.bin`: aplicacion compilada.
+- `assets/Firmware/bootloader.bin`: bootloader.
+- `assets/Firmware/partitions.bin`: tabla de particiones.
 
 Repo objetivo:
 

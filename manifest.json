@@ -9,7 +9,7 @@
       "chipFamily": "ESP32",
       "parts": [
         {
-          "path": "firmware/firmware-merged.bin",
+          "path": "assets/Firmware/firmware-merged.bin",
           "offset": 0
         }
       ]

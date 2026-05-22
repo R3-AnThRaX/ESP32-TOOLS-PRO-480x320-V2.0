@@ -867,6 +867,14 @@ bool signalToolsReplaySavedIrSlot(uint8_t slot) {
     return true;
 }
 
+bool signalToolsRenameSavedIrSlot(uint8_t slot, const String& name) {
+    return renameSavedIrSlot(slot, name);
+}
+
+bool signalToolsDeleteSavedIrSlot(uint8_t slot) {
+    return deleteSavedIrSlot(slot);
+}
+
 void runSignalTools() {
     static const char* items[] = {
         "Hardware Diag",
