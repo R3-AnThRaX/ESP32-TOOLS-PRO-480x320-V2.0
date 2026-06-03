@@ -217,8 +217,10 @@ Funciones disponibles en la fase 1:
   - `Direction Finder`: mide frente, derecha, atras e izquierda para sugerir la direccion mas fuerte.
   - `Beacon Spam`: demo web controlada con SSIDs de laboratorio, canal fijo del dashboard, boton start/stop y auto-stop.
   - `Deauther`, `Evil Portal`, `Probe Sniffer` y `KARMA Attack` aparecen como `LOCAL ONLY` para usarse desde la pantalla del dispositivo.
+- Bluetooth / Radio desde navegador:
+  - `BT Jammer`: se puede iniciar y detener directamente desde el dashboard web, sin confirmacion fisica en el dispositivo. Usalo solo en laboratorio propio y de corto alcance.
 
-El dashboard no ejecuta funciones que toman control completo del WiFi como Deauther, Evil Portal, KARMA o jamming. Es intencional para evitar conflictos con el AP del dashboard y mantenerlo estable.
+El dashboard mantiene como `LOCAL ONLY` las funciones que toman control completo del WiFi, como Deauther, Evil Portal y KARMA, para evitar conflictos con el AP del dashboard. `BT Jammer` es la excepcion actual: puede ejecutarse desde el panel web porque usa los nRF24L01 y no necesita confirmacion fisica.
 
 [Volver al indice](#indice)
 
